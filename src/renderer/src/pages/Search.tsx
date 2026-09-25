@@ -18,11 +18,12 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { searchStream, getSearchHistory, saveSearchHistory, clearSearchHistory, getSearchResources, getDoubanCategories } from '../lib/api'
-import { cacheSearchResults, cacheSearchResult } from '../lib/searchCache'
+import { cacheSearchResults, cacheSearchResult, getPersistedSearchResults, setPersistedSearchResults } from '../lib/searchCache'
 import { normalizeTitle, buildDetailUrl, calcProgress } from '../lib/utils'
 import { useStore } from '../lib/store'
 import type { SearchResult, SearchSSEEvent, DoubanCategoryItem } from '../types'
-import SmartImage from '../components/SmartImage'
+import MediaCard from '../components/MediaCard'
+import Icon from '../components/Icon'
 
 /** 单个源的搜索结果分组 */
 interface SourceGroup {
@@ -136,68 +137,45 @@ function SearchResultCard({ item, variants, query }: SearchResultCardProps) {
  }
 
  return (
- <div
+ <MediaCard
+ item={{ title: item.title, poster: item.poster }}
+ variant="search"
  onClick={() => goDetail(item)}
- className="card-hover relative cursor-pointer overflow-hidden group"
- >
- {/* ====== 封面区:仅保留角标 + 悬浮播放钮,标题信息下移 ====== */}
- <div className="relative aspect-[2/3] bg-[var(--color-hover-overlay-subtle)] overflow-hidden">
- <SmartImage src={item.poster} alt={item.title} className="w-full h-full transition-transform duration-300 group-hover:scale-110" />
-
- {/* 渐变遮罩(悬浮加深,仅底部微渐变保证角标可读) */}
- <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-70 group-hover:opacity-95 transition-opacity pointer-events-none" />
-
- {/* 角标:更新状态(右上) */}
- {item.vod_remarks && (
-<span className="absolute top-1.5 right-1.5 bg-black/75 backdrop-blur-sm text-white text-[10px] px-1.5 py-0.5 z-10 leading-none rounded">
-{item.vod_remarks}
-</span>
-)}
-
- {/* 左上角:年份 + 源数量 */}
+ progress={progress}
+ titlePrefix={
+ isExact ? (
+ <span className="flex-shrink-0 bg-emerald-500 text-white text-[9px] leading-none px-1 py-0.5 rounded">
+ 精确
+ </span>
+ ) : undefined
+ }
+ subtitle={
+ item.source_name ? (
+ <p className="text-[10px] text-white/60 truncate mt-0.5 drop-shadow-md">{item.source_name}</p>
+ ) : undefined
+ }
+ topLeft={
  <div className="absolute top-1.5 left-1.5 z-10 flex items-center gap-1">
  {item.year && item.year !== 'unknown' && (
  <span className="bg-black/75 backdrop-blur-sm text-white text-[10px] px-1.5 py-0.5 leading-none rounded">
-{item.year}
-</span>
+ {item.year}
+ </span>
  )}
  {sourceList.length > 1 && (
  <span className="bg-primary/85 backdrop-blur-sm text-white text-[10px] px-1.5 py-0.5 leading-none rounded">
-{sourceList.length} 源
-</span>
+ {sourceList.length} 源
+ </span>
  )}
  </div>
-
- {/* 悬浮播放按钮 */}
-	<div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none">
-		<div className="w-8 h-8 bg-primary flex items-center justify-center shadow-xl shadow-primary/70 scale-75 group-hover:scale-100 transition-transform duration-200 rounded-full">
-  <svg className="w-5 h-5 text-white ml-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 5v14l11-7z" /></svg>
- </div>
- </div>
-
- {/* 进度条(底部细条) */}
- {progress > 0 && (
- <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-black/50 z-20">
- <div className="h-full progress-bar" style={{ width: `${progress}%` }} />
- </div>
- )}
-
- {/* 标题 + 源名 叠加封面底部 */}
- <div className="absolute bottom-0 left-0 right-0 p-2 pointer-events-none z-10">
- <p className="text-xs font-medium text-white truncate flex items-center gap-1 drop-shadow-md">
- {isExact && (
- <span className="flex-shrink-0 bg-emerald-500 text-white text-[9px] leading-none px-1 py-0.5 rounded">
-精确
-</span>
- )}
- <span className="truncate">{item.title}</span>
- </p>
- {item.source_name && (
- <p className="text-[10px] text-white/60 truncate mt-0.5 drop-shadow-md">{item.source_name}</p>
- )}
- </div>
- </div>
- </div>
+ }
+ topRight={
+ item.vod_remarks ? (
+ <span className="absolute top-1.5 right-1.5 bg-black/75 backdrop-blur-sm text-white text-[10px] px-1.5 py-0.5 z-10 leading-none rounded">
+ {item.vod_remarks}
+ </span>
+ ) : undefined
+ }
+ />
  )
 }
 
@@ -234,7 +212,11 @@ export default function Search() {
  return saved === null ? true : saved === '1'
  }) // 默认开启18禁过滤,持久化
  const [nsfwSourceKeys, setNsfwSourceKeys] = useState<Set<string>>(new Set())
+ /** NSFW 源集合是否加载完成(完成前不发起搜索,避免集合为空时多搜一次) */
+ const [nsfwLoaded, setNsfwLoaded] = useState(false)
  const cancelRef = useRef<(() => void) | null>(null)
+ /** groups 的最新值镜像:complete 时据此持久化搜索结果 */
+ const groupsRef = useRef<SourceGroup[]>([])
  const [recommendList, setRecommendList] = useState<DoubanCategoryItem[]>([])
 
  // 开关变化时持久化
@@ -260,6 +242,7 @@ export default function Search() {
  setNsfwSourceKeys(keys)
  })
  .catch(() => {})
+ .finally(() => setNsfwLoaded(true))
  }, [])
 
  // 加载搜索历史(无关键词时展示)
@@ -273,7 +256,7 @@ export default function Search() {
  }
  }, [q])
 
- // 搜索触发时保存关键词到服务端
+ // 搜索触发时保存关键词(本地即时生效,服务器模式后台同步)
  useEffect(() => {
  if (q) {
  let cancelled = false
@@ -289,6 +272,7 @@ export default function Search() {
 
  if (!q) {
  setGroups([])
+ groupsRef.current = []
  setLoading(false)
  setTotalFound(0)
  setFilterSource('')
@@ -299,8 +283,33 @@ export default function Search() {
  return
  }
 
+ // 开启18禁过滤时,先等 NSFW 源集合加载完成再搜索(否则集合为空会白搜一次)
+ if (blockNSFW && !nsfwLoaded) {
+ setLoading(true)
+ return
+ }
+
+ // 优先恢复 30 分钟内的持久结果:
+ // 从详情/播放页返回时直接还原,不再发起全网搜索
+ const persisted = getPersistedSearchResults(q, hideTrailers, blockNSFW)
+ if (persisted) {
+ const found = persisted.reduce((n, g) => n + g.results.length, 0)
+ const errs = persisted
+ .filter((g) => g.error)
+ .map((g) => ({ source: g.source, sourceName: g.sourceName, error: g.error || '搜索失败' }))
+ setGroups(persisted)
+ groupsRef.current = persisted
+ setTotalFound(found)
+ setErrorSources(errs)
+ setCompletedSources(persisted.length)
+ setTotalSources(persisted.length)
+ setLoading(false)
+ return
+ }
+
  let mounted = true
  setGroups([])
+ groupsRef.current = []
  setTotalFound(0)
  setFilterSource('')
  setCompletedSources(0)
@@ -333,32 +342,48 @@ export default function Search() {
  if (filtered.length > 0) {
  cacheSearchResults(filtered)
  setGroups((prev) => {
+ let next: SourceGroup[]
  const idx = prev.findIndex((g) => g.source === e.source)
  if (idx >= 0) {
- const next = [...prev]
+ next = [...prev]
  next[idx] = {
  ...next[idx],
  results: [...next[idx].results, ...filtered]
  }
- return next
- }
- return [
+ } else {
+ next = [
  ...prev,
  { source: e.source, sourceName: e.sourceName, results: filtered }
  ]
+ }
+ groupsRef.current = next
+ return next
  })
  setTotalFound((prev) => prev + filtered.length)
  }
  setCompletedSources((prev) => prev + 1)
  } else if (e.type === 'source_error') {
  setCompletedSources((prev) => prev + 1)
- setErrorSources((prev) => [
- ...prev,
- { source: e.source, sourceName: e.sourceName, error: e.error }
- ])
+ const errInfo = { source: e.source, sourceName: e.sourceName, error: e.error }
+ setErrorSources((prev) => [...prev, errInfo])
+ // 错误也并入分组(空结果分组不渲染,但会随结果一起持久化,返回时可恢复错误提示)
+ setGroups((prev) => {
+ let next: SourceGroup[]
+ const idx = prev.findIndex((g) => g.source === e.source)
+ if (idx >= 0) {
+ next = [...prev]
+ next[idx] = { ...next[idx], error: e.error }
+ } else {
+ next = [...prev, { source: e.source, sourceName: e.sourceName, results: [], error: e.error }]
+ }
+ groupsRef.current = next
+ return next
+ })
  } else if (e.type === 'complete') {
  setLoading(false)
  setCompletedSources(e.completedSources || 0)
+ // 持久化最终结果(瘦身+LRU+30分钟TTL),详情/播放页返回时直接恢复
+ setPersistedSearchResults(q, hideTrailers, blockNSFW, groupsRef.current)
  }
  }
 
@@ -370,7 +395,7 @@ export default function Search() {
  cancel()
  cancelRef.current = null
  }
- }, [q, hideTrailers, blockNSFW, nsfwSourceKeys])
+ }, [q, hideTrailers, blockNSFW, nsfwSourceKeys, nsfwLoaded])
 
  const handleCancel = useCallback(() => {
  cancelRef.current?.()
@@ -508,7 +533,7 @@ const handleRecommendClick = useCallback((item: DoubanCategoryItem) => {
  {/* ============ 搜索框 ============ */}
  <div className="mb-6">
  <form onSubmit={handleSearch} className="relative max-w-2xl">
- <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-tertiary)] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+ <Icon name="search" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-text-tertiary)] pointer-events-none" />
  <input
  type="text"
  value={inputValue}
@@ -524,7 +549,7 @@ const handleRecommendClick = useCallback((item: DoubanCategoryItem) => {
  onClick={() => { setInputValue(''); setSearchParams({}, { replace: true }) }}
  className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
  >
- <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+ <Icon name="x" size={16} />
  </button>
  )}
  </form>
@@ -589,7 +614,7 @@ const handleRecommendClick = useCallback((item: DoubanCategoryItem) => {
  }}
  className="w-4 h-4 flex items-center justify-center text-[var(--color-text-quaternary)] hover:text-red-400 hover:bg-red-500/10 transition-colors flex-shrink-0"
  >
- <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+ <Icon name="x" size={12} />
  </span>
  </button>
  ))}
@@ -607,29 +632,23 @@ const handleRecommendClick = useCallback((item: DoubanCategoryItem) => {
  </h3>
  <div style={cardGridStyle}>
  {recommendList.map((item) => (
- <div
+ <MediaCard
  key={item.id}
+ item={{ title: item.title, poster: item.poster }}
+ variant="search"
+ play="none"
  onClick={() => handleRecommendClick(item)}
- className="card-hover cursor-pointer overflow-hidden group relative"
- >
- <div className="relative aspect-[2/3] bg-[var(--color-hover-overlay-subtle)] overflow-hidden">
- <SmartImage src={item.poster} alt={item.title} className="w-full h-full transition-transform duration-300 group-hover:scale-110" />
- <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-70 group-hover:opacity-95 transition-opacity pointer-events-none" />
- {item.year && (
+ topLeft={item.year ? (
       <span className="absolute top-1.5 left-1.5 bg-black/75 backdrop-blur-sm text-white text-[10px] px-1.5 py-0.5 z-10 leading-none rounded">
         {item.year}
       </span>
-    )}
-    {item.rate && item.rate !== '0' && (
+    ) : undefined}
+ topRight={item.rate && item.rate !== '0' ? (
       <span className="absolute top-1.5 right-1.5 bg-black/75 backdrop-blur-sm text-[10px] px-1.5 py-0.5 z-10 leading-none rounded" style={{ color: '#facc15' }}>
         ★ {item.rate}
       </span>
-    )}
-    <div className="absolute bottom-0 left-0 right-0 p-2 pointer-events-none z-10">
-      <p className="text-xs font-medium text-white truncate drop-shadow-md">{item.title}</p>
-    </div>
-  </div>
- </div>
+    ) : undefined}
+ />
  ))}
  </div>
  </div>
@@ -638,10 +657,10 @@ const handleRecommendClick = useCallback((item: DoubanCategoryItem) => {
  {history.length === 0 && recommendList.length === 0 && (
  <div className="flex flex-col items-center justify-center py-24 text-center">
  <div className="w-20 h-20 flex items-center justify-center bg-[var(--color-hover-overlay-subtle)] border border-[var(--color-border-subtle)] mb-5 rounded-lg">
- <svg className="w-9 h-9 text-[var(--color-text-quaternary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+ <Icon name="search" size={36} strokeWidth={1.2} className="text-[var(--color-text-quaternary)]" />
  </div>
  <p className="text-[var(--color-text-secondary)] text-sm">请输入关键词开始搜索</p>
- <p className="text-xs text-[var(--color-text-quaternary)] mt-2">搜索历史将同步到你的账号</p>
+ <p className="text-xs text-[var(--color-text-quaternary)] mt-2">搜索历史保存在本机,连接服务器后自动多端同步</p>
  </div>
  )}
  </div>
@@ -779,7 +798,7 @@ const handleRecommendClick = useCallback((item: DoubanCategoryItem) => {
  {q && !loading && errorSources.length > 0 && (
  <div className="mt-6 glass-panel p-4">
  <div className="flex items-center gap-2 mb-2">
- <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+ <Icon name="alert" size={16} strokeWidth={1.8} className="text-amber-400 flex-shrink-0" />
  <p className="text-xs text-[var(--color-text-secondary)] font-medium">{errorSources.length} 个源搜索失败</p>
  </div>
  <div className="flex flex-wrap gap-2">
@@ -796,7 +815,7 @@ const handleRecommendClick = useCallback((item: DoubanCategoryItem) => {
  {q && !loading && !hasResults && (
  <div className="flex flex-col items-center justify-center py-24 text-center">
  <div className="w-20 h-20 flex items-center justify-center bg-[var(--color-hover-overlay-subtle)] border border-[var(--color-border-subtle)] mb-5 rounded-lg">
- <svg className="w-9 h-9 text-[var(--color-text-quaternary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.2"><path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5a1.125 1.125 0 01-1.125-1.125M15 5.625h-6m6 0a8.25 8.25 0 016 2.825m-6-2.825v12.75m6-9.925a8.25 8.25 0 016 2.825M3.375 5.625h17.25" /></svg>
+ <Icon name="film" size={36} strokeWidth={1.2} className="text-[var(--color-text-quaternary)]" />
  </div>
  <p className="text-[var(--color-text-secondary)] mb-2">
  未找到与 "<span className="text-white">{q}</span>" 相关的结果
@@ -828,29 +847,23 @@ const handleRecommendClick = useCallback((item: DoubanCategoryItem) => {
  </h3>
  <div style={cardGridStyle}>
  {recommendList.map((item) => (
- <div
+ <MediaCard
  key={item.id}
+ item={{ title: item.title, poster: item.poster }}
+ variant="search"
+ play="none"
  onClick={() => handleRecommendClick(item)}
- className="card-hover cursor-pointer overflow-hidden group relative"
- >
- <div className="relative aspect-[2/3] bg-[var(--color-hover-overlay-subtle)] overflow-hidden">
- <SmartImage src={item.poster} alt={item.title} className="w-full h-full transition-transform duration-300 group-hover:scale-110" />
- <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-70 group-hover:opacity-95 transition-opacity pointer-events-none" />
- {item.year && (
+ topLeft={item.year ? (
       <span className="absolute top-1.5 left-1.5 bg-black/75 backdrop-blur-sm text-white text-[10px] px-1.5 py-0.5 z-10 leading-none rounded">
         {item.year}
       </span>
-    )}
-    {item.rate && item.rate !== '0' && (
+    ) : undefined}
+ topRight={item.rate && item.rate !== '0' ? (
       <span className="absolute top-1.5 right-1.5 bg-black/75 backdrop-blur-sm text-[10px] px-1.5 py-0.5 z-10 leading-none rounded" style={{ color: '#facc15' }}>
         ★ {item.rate}
       </span>
-    )}
-    <div className="absolute bottom-0 left-0 right-0 p-2 pointer-events-none z-10">
-      <p className="text-xs font-medium text-white truncate drop-shadow-md">{item.title}</p>
-    </div>
-  </div>
- </div>
+    ) : undefined}
+ />
  ))}
  </div>
  </div>

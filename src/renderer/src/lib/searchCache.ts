@@ -14,6 +14,8 @@
 import type { SearchResult } from '../types'
 import { generateStorageKey } from '../types'
 import { normalizeTitle } from './utils'
+import { getCached, setCached, clearByPrefix } from './ttlCache'
+import { getHomeModeKey } from './homeCache'
 
 /** 内存缓存:以 source+id 为键 */
 const cache = new Map<string, SearchResult>()
@@ -93,6 +95,132 @@ export function cacheSearchResults(items: SearchResult[]): void {
 export function clearSearchCache(): void {
   cache.clear()
   titleIndex.clear()
+  // 同步清空持久化的"关键词→结果列表"缓存(搜索历史保留)
+  clearPersistedResults()
+}
+
+/* ============================================================
+ * 关键词搜索结果持久缓存
+ *
+ * 场景:搜索后进入详情/播放页再返回,Search 组件会卸载重挂载,
+ * 若无缓存会重新发起一次全网搜索。持久缓存让返回时直接恢复结果。
+ *
+ * - 存储:localStorage,TTL 30 分钟(覆盖页面往返;超时重新搜索)
+ * - 隔离:按"数据模式(服务器/自定义视频源)+ 过滤开关 + 关键词"建键
+ * - 瘦身:只持久化展示字段(剥离 episodes 等大字段),详情走详情接口/内存缓存
+ * - LRU:最多保留最近 3 个关键词,超出淘汰最旧,避免撑爆 localStorage
+ * ============================================================ */
+
+const RESULT_PREFIX = 'search:results:'
+const RESULT_INDEX_KEY = RESULT_PREFIX + 'index'
+/** 结果缓存有效期:30 分钟 */
+const RESULT_TTL = 30 * 60 * 1000
+/** 最多缓存的关键词数量(LRU) */
+const RESULT_MAX_KEYS = 3
+/** 单个源分组最多持久化的条数(超出截断) */
+const RESULT_MAX_PER_GROUP = 150
+/** 单次搜索最多持久化的总条数(所有源合计,控制 localStorage 体积) */
+const RESULT_MAX_TOTAL = 300
+
+/** 持久化的源分组(结构同 Search 页 SourceGroup) */
+export interface PersistedSourceGroup {
+  source: string
+  sourceName: string
+  results: SearchResult[]
+  error?: string
+}
+
+/** 仅保留卡片展示/跳转所需字段,剥离 episodes 等大字段 */
+function slimResult(r: SearchResult): SearchResult {
+  // 解构剔除 episodes(体积最大的集数/播放地址数组),持久化只用于结果列表展示
+  const { episodes: _omit, ...rest } = r
+  void _omit
+  return rest as unknown as SearchResult
+}
+
+function readResultIndex(): string[] {
+  try {
+    const raw = localStorage.getItem('mtvp:' + RESULT_INDEX_KEY)
+    const arr = raw ? JSON.parse(raw) : []
+    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function writeResultIndex(keys: string[]): void {
+  try {
+    localStorage.setItem('mtvp:' + RESULT_INDEX_KEY, JSON.stringify(keys.slice(0, RESULT_MAX_KEYS)))
+  } catch {
+    // ignore
+  }
+}
+
+/** 构造结果缓存键(含模式与过滤开关,保证不同配置互不串用) */
+function buildResultCacheKey(keyword: string, hideTrailers: boolean, blockNSFW: boolean): string {
+  return `${RESULT_PREFIX}${getHomeModeKey()}|${hideTrailers ? 1 : 0}${blockNSFW ? 1 : 0}|${keyword.trim()}`
+}
+
+/**
+ * 读取某次搜索的持久结果;不存在或已过期返回 null。
+ * 返回的 groups 可直接恢复页面状态(不重新发起搜索)。
+ */
+export function getPersistedSearchResults(
+  keyword: string,
+  hideTrailers: boolean,
+  blockNSFW: boolean
+): PersistedSourceGroup[] | null {
+  const key = buildResultCacheKey(keyword, hideTrailers, blockNSFW)
+  const groups = getCached<PersistedSourceGroup[]>(key, RESULT_TTL)
+  if (!groups) return null
+  // 命中即提到 LRU 最前
+  const idx = readResultIndex().filter((k) => k !== key)
+  writeResultIndex([key, ...idx])
+  return groups
+}
+
+/** 持久化某次搜索的最终结果(complete 时调用) */
+export function setPersistedSearchResults(
+  keyword: string,
+  hideTrailers: boolean,
+  blockNSFW: boolean,
+  groups: PersistedSourceGroup[]
+): void {
+  const key = buildResultCacheKey(keyword, hideTrailers, blockNSFW)
+  const slimmed: PersistedSourceGroup[] = []
+  let budget = RESULT_MAX_TOTAL
+  for (const g of groups) {
+    if (budget <= 0) break
+    const slice = g.results.slice(0, RESULT_MAX_PER_GROUP).slice(0, budget).map(slimResult)
+    budget -= slice.length
+    if (slice.length > 0 || g.error) {
+      slimmed.push({ source: g.source, sourceName: g.sourceName, error: g.error, results: slice })
+    }
+  }
+  if (slimmed.length === 0) return
+
+  setCached(key, slimmed, RESULT_TTL)
+
+  // LRU:新键置顶,超出上限的最旧键删除
+  const idx = readResultIndex().filter((k) => k !== key)
+  const next = [key, ...idx]
+  writeResultIndex(next.slice(0, RESULT_MAX_KEYS))
+  for (const old of next.slice(RESULT_MAX_KEYS)) {
+    removeCachedKey(old)
+  }
+}
+
+function removeCachedKey(fullSubKey: string): void {
+  try {
+    localStorage.removeItem('mtvp:' + fullSubKey)
+  } catch {
+    // ignore
+  }
+}
+
+/** 清空全部持久化的搜索结果(切换模式/换源时随 clearSearchCache 调用) */
+export function clearPersistedResults(): void {
+  clearByPrefix(RESULT_PREFIX)
 }
 
 /** 读取缓存的搜索结果(可能为 null) */

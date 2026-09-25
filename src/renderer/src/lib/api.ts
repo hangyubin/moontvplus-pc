@@ -18,7 +18,7 @@ import type {
   DeviceInfo,
   SkipConfig
 } from '../types'
-import { createApiClient, getToken, apiUrl } from './auth'
+import { createApiClient, getToken, apiUrl, getBaseUrl } from './auth'
 import { hasCustomVideo, getCustomVideoSource } from './customSource'
 
 export const client = createApiClient()
@@ -728,24 +728,90 @@ export async function deleteFavorite(key: string): Promise<boolean> {
   return res.data?.success === true
 }
 
-/* ============ 搜索历史 ============ */
+/* ============ 搜索历史 ============
+ * 本地优先(localStorage,服务器/自定义源双模式均可用),
+ * 服务器模式下额外同步到服务端(多端一致),同步失败不影响本地。
+ */
+const SEARCH_HISTORY_KEY = 'mtvp:search:history'
+const SEARCH_HISTORY_MAX = 20
+
+function readLocalHistory(): string[] {
+  try {
+    const raw = localStorage.getItem(SEARCH_HISTORY_KEY)
+    const arr = raw ? JSON.parse(raw) : []
+    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function writeLocalHistory(list: string[]): void {
+  try {
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(list.slice(0, SEARCH_HISTORY_MAX)))
+  } catch {
+    // 配额失败等:忽略,不影响搜索主流程
+  }
+}
+
+/** 合并去重(本地在前),服务端历史追加在后 */
+function mergeHistory(local: string[], remote: string[]): string[] {
+  const seen = new Set<string>()
+  const merged: string[] = []
+  for (const kw of [...local, ...remote]) {
+    const k = kw.trim()
+    if (k && !seen.has(k)) {
+      seen.add(k)
+      merged.push(k)
+    }
+  }
+  return merged.slice(0, SEARCH_HISTORY_MAX)
+}
+
 export async function getSearchHistory(): Promise<string[]> {
-  const res = await client.get<string[]>('/api/searchhistory')
-  // 服务端异常返回非数组(如 SPA fallback 的 HTML)时兜底为空数组,防止渲染层 .map 崩溃
-  return Array.isArray(res.data) ? res.data : []
+  const local = readLocalHistory()
+  // 服务器模式:尝试拉取服务端历史并合并(自定义源/离线时直接用本地)
+  if (getBaseUrl()) {
+    try {
+      const res = await client.get<string[]>('/api/searchhistory')
+      if (Array.isArray(res.data)) {
+        const merged = mergeHistory(local, res.data)
+        writeLocalHistory(merged)
+        return merged
+      }
+    } catch {
+      // 服务端不可用:降级到本地
+    }
+  }
+  return local
 }
 
-/** 保存搜索关键词到服务端,返回最新历史列表 */
+/** 保存搜索关键词:本地即时生效,服务器模式后台同步,返回最新历史列表 */
 export async function saveSearchHistory(keyword: string): Promise<string[]> {
-  const res = await client.post<string[]>('/api/searchhistory', { keyword })
-  return Array.isArray(res.data) ? res.data : []
+  const kw = keyword.trim()
+  const prev = readLocalHistory()
+  const next = kw ? [kw, ...prev.filter((h) => h !== kw)].slice(0, SEARCH_HISTORY_MAX) : prev
+  writeLocalHistory(next)
+
+  if (kw && getBaseUrl()) {
+    // 后台同步,不阻塞 UI;失败保留本地
+    client.post<string[]>('/api/searchhistory', { keyword: kw }).catch(() => {})
+  }
+  return next
 }
 
-/** 删除单条搜索历史(带 keyword)或清空全部(不带) */
+/** 删除单条搜索历史(带 keyword)或清空全部(不带):本地即时生效,服务器模式后台同步 */
 export async function clearSearchHistory(keyword?: string): Promise<boolean> {
-  const params = keyword ? { keyword } : {}
-  const res = await client.delete('/api/searchhistory', { params })
-  return res.data?.success === true
+  const kw = keyword?.trim()
+  const next = kw
+    ? readLocalHistory().filter((h) => h !== kw)
+    : []
+  writeLocalHistory(next)
+
+  if (getBaseUrl()) {
+    const params = kw ? { keyword: kw } : {}
+    client.delete('/api/searchhistory', { params }).catch(() => {})
+  }
+  return true
 }
 
 /* ============ 跳过配置 ============ */

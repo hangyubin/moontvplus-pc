@@ -7,7 +7,8 @@ import { useNavigate } from 'react-router-dom'
 import { useStore, sortedPlayRecords } from '../lib/store'
 import { clearPlayRecords } from '../lib/api'
 import { formatRelativeTime, buildPlayUrl, calcProgress } from '../lib/utils'
-import SmartImage from '../components/SmartImage'
+import Icon from '../components/Icon'
+import MediaCard from '../components/MediaCard'
 import { parseStorageKey } from '../types'
 import type { PlayRecord } from '../types'
 
@@ -140,15 +141,11 @@ export default function History() {
               placeholder="搜索观看记录..."
               className="input-field w-full pl-10"
             />
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-quaternary)] group-focus-within:text-[var(--color-primary)] transition-colors pointer-events-none"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-            </svg>
+            <Icon
+              name="search"
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-quaternary)] group-focus-within:text-[var(--color-primary)] transition-colors pointer-events-none"
+            />
             {keyword && (
               <button
                 onClick={() => setKeyword('')}
@@ -188,69 +185,54 @@ export default function History() {
               const progress = calcProgress(record.play_time, record.total_time)
               const episodeText = getEpisodeText(record)
               return (
-                <div
+                <MediaCard
                   key={key}
+                  variant="plain"
+                  horizontal
+                  item={{ title: record.title, poster: record.cover }}
                   onClick={() => handleClick(key, record)}
-                  className="card-hover cursor-pointer group relative flex overflow-hidden"
                   style={{
                     background: 'var(--color-card-bg)',
                     border: '1px solid var(--color-border-subtle)',
                   }}
-                >
-                  {/* 封面 */}
-                  <div className="relative w-28 flex-shrink-0 bg-[var(--color-hover-overlay-subtle)] overflow-hidden">
-                    <SmartImage
-                      src={record.cover}
-                      alt={record.title}
-                      className="w-full h-full"
-                    />
-                    {/* 悬浮播放按钮 */}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span
-                        className="w-6 h-6 flex items-center justify-center text-lg text-white rounded-full bg-primary shadow-xl shadow-primary/70"
-                      >
-                        <svg className="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 5v14l11-7z" /></svg>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* 信息区 */}
-                  <div className="flex-1 p-3.5 flex flex-col justify-between min-w-0">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
-                        {record.title}
-                      </p>
-                      <p className="text-xs text-[var(--color-text-tertiary)] mt-1 truncate">
-                        {episodeText}
-                      </p>
-                      <p className="text-xs text-[var(--color-text-quaternary)] mt-0.5 truncate">
-                        {formatRelativeTime(record.save_time)}
-                      </p>
-                    </div>
-
-                    {/* 进度条 */}
-                    <div className="mt-2">
-                      <div className="flex items-center justify-between text-xs text-[var(--color-text-quaternary)] mb-1.5">
-                        <span>已观看 {Math.round(progress)}%</span>
+                  topRight={
+                    <button
+                      onClick={(e) => handleDelete(e, key)}
+                      title="删除记录"
+                      className="absolute top-2 right-2 w-7 h-7 bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80 rounded"
+                    >
+                      ✕
+                    </button>
+                  }
+                  footer={
+                    <div className="flex-1 p-3.5 flex flex-col justify-between min-w-0">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
+                          {record.title}
+                        </p>
+                        <p className="text-xs text-[var(--color-text-tertiary)] mt-1 truncate">
+                          {episodeText}
+                        </p>
+                        <p className="text-xs text-[var(--color-text-quaternary)] mt-0.5 truncate">
+                          {formatRelativeTime(record.save_time)}
+                        </p>
                       </div>
-                      <div className="h-1.5 bg-[var(--color-hover-overlay)] overflow-hidden rounded-full">
-                        <div
-                          className="h-full progress-bar rounded-full"
-                          style={{ width: `${progress}%` }}
-                        />
+
+                      {/* 进度条 */}
+                      <div className="mt-2">
+                        <div className="flex items-center justify-between text-xs text-[var(--color-text-quaternary)] mb-1.5">
+                          <span>已观看 {Math.round(progress)}%</span>
+                        </div>
+                        <div className="h-1.5 bg-[var(--color-hover-overlay)] overflow-hidden rounded-full">
+                          <div
+                            className="h-full progress-bar rounded-full"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-
-                  {/* 删除按钮 */}
-                  <button
-                    onClick={(e) => handleDelete(e, key)}
-                    title="删除记录"
-                    className="absolute top-2 right-2 w-7 h-7 bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80 rounded"
-                  >
-                    ✕
-                  </button>
-                </div>
+                  }
+                />
               )
             })}
           </div>
@@ -274,9 +256,7 @@ export default function History() {
                 border: '1px solid var(--color-border-subtle)',
               }}
             >
-              <svg className="w-8 h-8 text-[var(--color-text-quaternary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-              </svg>
+              <Icon name="search" size={32} strokeWidth={1.5} className="text-[var(--color-text-quaternary)]" />
             </div>
             <p className="text-sm text-[var(--color-text-secondary)]">
               未找到匹配 &ldquo;<span className="text-[var(--color-text-primary)] font-medium">{keyword}</span>&rdquo; 的观看记录
@@ -295,65 +275,42 @@ export default function History() {
               const progress = calcProgress(record.play_time, record.total_time)
               const episodeText = getEpisodeText(record)
               return (
-                <div
+                <MediaCard
                   key={key}
+                  variant="plain"
+                  item={{ title: record.title, poster: record.cover }}
                   onClick={() => handleClick(key, record)}
-                  className="card-hover cursor-pointer overflow-hidden group relative"
+                  progress={progress}
                   style={{
                     background: 'var(--color-card-bg)',
                     border: '1px solid var(--color-border-subtle)',
                   }}
-                >
-                  {/* 封面区 */}
-                  <div className="relative aspect-[2/3] bg-[var(--color-hover-overlay-subtle)] overflow-hidden">
-                    <SmartImage
-                      src={record.cover}
-                      alt={record.title}
-                      className="w-full h-full"
-                    />
-
-                    {/* 悬浮播放遮罩 */}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span
-                        className="w-6 h-6 flex items-center justify-center text-lg text-white rounded-full bg-primary shadow-xl shadow-primary/70"
-                      >
-                        <svg className="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 5v14l11-7z" /></svg>
-                      </span>
-                    </div>
-
-                    {/* 右上角删除按钮 */}
-                  <button
-                    onClick={(e) => handleDelete(e, key)}
-                    title="删除记录"
-                    className="absolute top-2 right-2 w-7 h-7 bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80 z-10 rounded"
-                  >
-                    ✕
-                  </button>
-
-                  {/* 集数角标 */}
-                  <span className="absolute bottom-2 left-2 bg-black/75 text-white text-xs px-2 py-0.5 rounded">
+                  topRight={
+                    <button
+                      onClick={(e) => handleDelete(e, key)}
+                      title="删除记录"
+                      className="absolute top-2 right-2 w-7 h-7 bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80 z-10 rounded"
+                    >
+                      ✕
+                    </button>
+                  }
+                  bottomLeft={
+                    <span className="absolute bottom-2 left-2 bg-black/75 text-white text-xs px-2 py-0.5 rounded">
                       {episodeText}
                     </span>
-
-                    {/* 进度条 */}
-                    {progress > 0 && (
-                      <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-black/50 z-10">
-                        <div className="h-full progress-bar" style={{ width: `${progress}%` }} />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 信息区 */}
-                  <div className="p-2.5">
-                    <p className="text-sm text-[var(--color-text-primary)] truncate">{record.title}</p>
-                    <p className="text-xs text-[var(--color-text-tertiary)] mt-1 truncate">
-                      {episodeText}
-                    </p>
-                    <p className="text-xs text-[var(--color-text-quaternary)] mt-0.5 truncate">
-                      {record.source_name} · {formatRelativeTime(record.save_time)}
-                    </p>
-                  </div>
-                </div>
+                  }
+                  footer={
+                    <div className="p-2.5">
+                      <p className="text-sm text-[var(--color-text-primary)] truncate">{record.title}</p>
+                      <p className="text-xs text-[var(--color-text-tertiary)] mt-1 truncate">
+                        {episodeText}
+                      </p>
+                      <p className="text-xs text-[var(--color-text-quaternary)] mt-0.5 truncate">
+                        {record.source_name} · {formatRelativeTime(record.save_time)}
+                      </p>
+                    </div>
+                  }
+                />
               )
             })}
           </div>
@@ -381,9 +338,7 @@ export default function History() {
                 className="w-14 h-14 flex items-center justify-center mb-4"
                 style={{ background: 'rgba(220, 38, 38, 0.12)' }}
               >
-                <svg className="w-7 h-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                </svg>
+                <Icon name="alert" size={28} className="text-red-400" />
               </div>
               <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">清空全部观看记录</h3>
             </div>

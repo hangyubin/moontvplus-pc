@@ -22,6 +22,34 @@ const api = {
       ipcRenderer.on('window:maximizeChanged', handler)
       return () => ipcRenderer.removeListener('window:maximizeChanged', handler)
     }
+  },
+  live: {
+    startRecording: (payload: { recordId: string; url: string; channelName: string }) =>
+      ipcRenderer.invoke('live:startRecording', payload),
+    stopRecording: (recordId: string) => ipcRenderer.invoke('live:stopRecording', recordId),
+    getRecordingStatus: (recordId: string) => ipcRenderer.invoke('live:getRecordingStatus', recordId),
+    listRecordings: () => ipcRenderer.invoke('live:listRecordings'),
+    openRecordingFolder: () => ipcRenderer.invoke('live:openRecordingFolder'),
+    onRecordingProgress: (callback: (data: { recordId: string; bytes: number; filePath: string }) => void) => {
+      const handler = (_event: unknown, data: { recordId: string; bytes: number; filePath: string }) => callback(data)
+      ipcRenderer.on('live:recordingProgress', handler)
+      return () => ipcRenderer.removeListener('live:recordingProgress', handler)
+    },
+    onRecordingComplete: (callback: (data: { recordId: string; filePath: string; bytes: number }) => void) => {
+      const handler = (_event: unknown, data: { recordId: string; filePath: string; bytes: number }) => callback(data)
+      ipcRenderer.on('live:recordingComplete', handler)
+      return () => ipcRenderer.removeListener('live:recordingComplete', handler)
+    },
+    onRecordingStopped: (callback: (data: { recordId: string; filePath: string }) => void) => {
+      const handler = (_event: unknown, data: { recordId: string; filePath: string }) => callback(data)
+      ipcRenderer.on('live:recordingStopped', handler)
+      return () => ipcRenderer.removeListener('live:recordingStopped', handler)
+    },
+    onRecordingError: (callback: (data: { recordId: string; error: string; filePath: string }) => void) => {
+      const handler = (_event: unknown, data: { recordId: string; error: string; filePath: string }) => callback(data)
+      ipcRenderer.on('live:recordingError', handler)
+      return () => ipcRenderer.removeListener('live:recordingError', handler)
+    }
   }
 }
 

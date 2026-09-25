@@ -4,14 +4,18 @@
  * - 主题切换
  */
 import { useState, useEffect } from 'react'
+import type { ReactNode } from 'react'
 import {
   getCustomVideoSource,
   setCustomVideoSource,
   getCustomLiveSource,
   setCustomLiveSource,
+  getCustomLiveEpg,
+  setCustomLiveEpg,
   getCustomMusicSource,
   setCustomMusicSource,
 } from '../lib/customSource'
+import { clearLiveEpgCache } from '../lib/live'
 import { useStore } from '../lib/store'
 import { getBaseUrl } from '../lib/auth'
 import { clearCustomVideoSitesCache, clearCustomStreamResolveCache, refreshCustomApiSites } from '../lib/api'
@@ -20,12 +24,45 @@ import { clearHomeCache } from '../lib/homeCache'
 import { clearImageCache } from '../lib/image'
 import { toast } from '../components/Toast'
 
+/**
+ * 表单字段容器:标签行(可带右侧状态 badge)+ 输入控件 + 说明文字
+ * 统一设置页重复 9 次的"标签 + 输入框 + hint"结构
+ */
+function FormField({
+  label,
+  status,
+  hint,
+  children,
+}: {
+  label: ReactNode
+  /** 标签行右侧状态文本/节点(如"已启用"),渲染为主色 badge */
+  status?: ReactNode
+  hint?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-sm font-medium text-[var(--color-text-primary)]">{label}</label>
+        {status && (
+          <span className="badge text-xs font-medium" style={{ color: 'var(--color-primary)' }}>
+            {status}
+          </span>
+        )}
+      </div>
+      {children}
+      {hint && <p className="text-xs text-[var(--color-text-tertiary)] mt-1.5">{hint}</p>}
+    </div>
+  )
+}
+
 export default function Settings() {
   const { auth, serverConfig, login, logout } = useStore()
   const [hideTrailers, setHideTrailers] = useState(true)
   const [blockNSFW, setBlockNSFW] = useState(true)
   const [customVideo, setCustomVideo] = useState('')
   const [customLive, setCustomLive] = useState('')
+  const [customLiveEpg, setCustomLiveEpgInput] = useState('')
   const [customMusicUrl, setCustomMusicUrl] = useState('')
   const [customMusicToken, setCustomMusicToken] = useState('')
   const [customMusicUsername, setCustomMusicUsername] = useState('')
@@ -44,6 +81,7 @@ export default function Settings() {
     setBlockNSFW(localStorage.getItem('search_blockNSFW') !== '0')
     setCustomVideo(getCustomVideoSource())
     setCustomLive(getCustomLiveSource())
+    setCustomLiveEpgInput(getCustomLiveEpg())
     const m = getCustomMusicSource()
     setCustomMusicUrl(m.url)
     setCustomMusicToken(m.token)
@@ -56,7 +94,10 @@ export default function Settings() {
   const saveCustomSources = () => {
     setCustomVideoSource(customVideo)
     setCustomLiveSource(customLive)
+    setCustomLiveEpg(customLiveEpg)
     setCustomMusicSource(customMusicUrl, customMusicToken, customMusicUsername)
+    // EPG URL 可能变化,清除直播 EPG 内存缓存,下次进直播页重新拉取
+    clearLiveEpgCache()
     // 视频 URL 可能变化,清掉源列表 / 中转页流解析 / 搜索详情内存缓存,
     // 防止旧源的源列表、share 映射、搜索结果串到新配置或与服务器模式混淆
     clearCustomVideoSitesCache()
@@ -168,15 +209,14 @@ export default function Settings() {
             boxShadow: 'var(--shadow-card)',
           }}
         >
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-[var(--color-text-primary)]">服务器地址</label>
-              {serverConnected && (
-                <span className="badge text-xs font-medium" style={{ color: 'var(--color-primary)' }}>
-                  已连接{serverConfig?.SiteName ? ` · ${serverConfig.SiteName}` : ''}
-                </span>
-              )}
-            </div>
+          <FormField
+            label="服务器地址"
+            status={
+              serverConnected
+                ? `已连接${serverConfig?.SiteName ? ` · ${serverConfig.SiteName}` : ''}`
+                : undefined
+            }
+          >
             <input
               type="text"
               value={serverUrl}
@@ -186,9 +226,8 @@ export default function Settings() {
               className="input-field w-full text-xs"
               style={{ background: 'var(--color-bg-secondary)' }}
             />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-[var(--color-text-primary)] block mb-2">用户名</label>
+          </FormField>
+          <FormField label="用户名">
             <input
               type="text"
               value={serverUser}
@@ -199,9 +238,8 @@ export default function Settings() {
               className="input-field w-full text-xs"
               style={{ background: 'var(--color-bg-secondary)' }}
             />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-[var(--color-text-primary)] block mb-2">密码</label>
+          </FormField>
+          <FormField label="密码">
             <input
               type="password"
               value={serverPass}
@@ -212,7 +250,7 @@ export default function Settings() {
               className="input-field w-full text-xs"
               style={{ background: 'var(--color-bg-secondary)' }}
             />
-          </div>
+          </FormField>
           {serverMsg && (
             <p
               className={`text-xs ${serverMsg.type === 'ok' ? 'text-[var(--color-primary)]' : 'text-red-400'}`}
@@ -259,20 +297,11 @@ export default function Settings() {
           }}
         >
           {/* 视频点播源 */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-[var(--color-text-primary)]">
-                视频点播源
-              </label>
-              {customVideo.trim() && (
-                <span
-                  className="badge text-xs font-medium"
-                  style={{ color: 'var(--color-primary)' }}
-                >
-                  已启用
-                </span>
-              )}
-            </div>
+          <FormField
+            label="视频点播源"
+            status={customVideo.trim() ? '已启用' : undefined}
+            hint="聚合 CMS 源列表 URL(返回 JSON,含 api_site 字段)。每个源按苹果 CMS API 直接调用"
+          >
             <input
               type="text"
               value={customVideo}
@@ -282,26 +311,14 @@ export default function Settings() {
               className="input-field w-full text-xs"
               style={{ background: 'var(--color-bg-secondary)' }}
             />
-            <p className="text-xs text-[var(--color-text-tertiary)] mt-1.5">
-              聚合 CMS 源列表 URL(返回 JSON,含 api_site 字段)。每个源按苹果 CMS API 直接调用
-            </p>
-          </div>
+          </FormField>
 
           {/* 直播源 */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-[var(--color-text-primary)]">
-                直播源
-              </label>
-              {customLive.trim() && (
-                <span
-                  className="badge text-xs font-medium"
-                  style={{ color: 'var(--color-primary)' }}
-                >
-                  已启用
-                </span>
-              )}
-            </div>
+          <FormField
+            label="直播源"
+            status={customLive.trim() ? '已启用' : undefined}
+            hint="标准 M3U 播放列表 URL(#EXTM3U 格式),客户端直接解析并播放"
+          >
             <input
               type="text"
               value={customLive}
@@ -311,26 +328,31 @@ export default function Settings() {
               className="input-field w-full text-xs"
               style={{ background: 'var(--color-bg-secondary)' }}
             />
-            <p className="text-xs text-[var(--color-text-tertiary)] mt-1.5">
-              标准 M3U 播放列表 URL(#EXTM3U 格式),客户端直接解析并播放
-            </p>
-          </div>
+          </FormField>
+
+          {/* XMLTV EPG 节目单 */}
+          <FormField
+            label="XMLTV EPG 节目单"
+            status={customLiveEpg.trim() ? '已配置' : undefined}
+            hint="XMLTV 格式(.xml/.xml.gz)的节目单地址,用于显示频道当前/下一节目;留空时自动使用 M3U 头部 x-tvg-url"
+          >
+            <input
+              type="text"
+              value={customLiveEpg}
+              onChange={(e) => setCustomLiveEpgInput(e.target.value)}
+              placeholder="http://example.com/epg.xml(可留空,自动读取 M3U 中的 x-tvg-url)"
+              spellCheck={false}
+              className="input-field w-full text-xs"
+              style={{ background: 'var(--color-bg-secondary)' }}
+            />
+          </FormField>
 
           {/* 音乐源 */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-[var(--color-text-primary)]">
-                音乐源
-              </label>
-              {customMusicUrl.trim() && (
-                <span
-                  className="badge text-xs font-medium"
-                  style={{ color: 'var(--color-primary)' }}
-                >
-                  已启用
-                </span>
-              )}
-            </div>
+          <FormField
+            label="音乐源"
+            status={customMusicUrl.trim() ? '已启用' : undefined}
+            hint="LX Music Web (lxserver) 地址,搜索与播放均走自定义源"
+          >
             <input
               type="text"
               value={customMusicUrl}
@@ -340,18 +362,13 @@ export default function Settings() {
               className="input-field w-full text-xs"
               style={{ background: 'var(--color-bg-secondary)' }}
             />
-            <p className="text-xs text-[var(--color-text-tertiary)] mt-1.5">
-              LX Music Web (lxserver) 地址,搜索与播放均走自定义源
-            </p>
-          </div>
+          </FormField>
 
           {/* 音乐源 Token */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-[var(--color-text-primary)]">
-                音乐源 Token
-              </label>
-            </div>
+          <FormField
+            label="音乐源 Token"
+            hint="推荐 lxserver 持久 Token(x-user-token),避免触发频控;匿名访问仅用于只读场景"
+          >
             <input
               type="password"
               value={customMusicToken}
@@ -361,18 +378,10 @@ export default function Settings() {
               className="input-field w-full text-xs"
               style={{ background: 'var(--color-bg-secondary)' }}
             />
-            <p className="text-xs text-[var(--color-text-tertiary)] mt-1.5">
-              推荐 lxserver 持久 Token(x-user-token),避免触发频控;匿名访问仅用于只读场景
-            </p>
-          </div>
+          </FormField>
 
           {/* 音乐源用户名 */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-[var(--color-text-primary)]">
-                音乐源用户名(可选)
-              </label>
-            </div>
+          <FormField label="音乐源用户名(可选)">
             <input
               type="text"
               value={customMusicUsername}
@@ -382,7 +391,7 @@ export default function Settings() {
               className="input-field w-full text-xs"
               style={{ background: 'var(--color-bg-secondary)' }}
             />
-          </div>
+          </FormField>
 
           {/* 保存/刷新按钮 */}
           <div className="flex gap-2 pt-1">

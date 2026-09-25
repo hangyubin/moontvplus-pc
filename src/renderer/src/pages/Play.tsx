@@ -14,6 +14,7 @@ import { getDetailWithCache, cacheSearchResults, findSourcesByTitle } from '../l
 import { useStore } from '../lib/store'
 import { generateStorageKey, type PlayRecord, type SearchResult, type SearchSSEEvent } from '../types'
 import WindowControls from '../components/WindowControls'
+import Icon from '../components/Icon'
 
 /** 判断 URL 是否为 HLS(m3u8)流:含 .m3u8 扩展或为服务端代理地址 */
 function isHlsStream(url: string): boolean {
@@ -602,9 +603,7 @@ export default function Play() {
  onClick={goBack}
  className="flex items-center gap-1.5 px-3 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] bg-[var(--color-hover-overlay)] hover:bg-[var(--color-hover-overlay-strong)] transition-all flex-shrink-0 group rounded"
  >
- <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
- <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
- </svg>
+ <Icon name="chevron-left" size={16} className="transition-transform group-hover:-translate-x-0.5" />
  <span>返回</span>
  </button>
  {/* 分隔线 */}
@@ -633,9 +632,7 @@ export default function Play() {
  className="w-8 flex items-center justify-center hover:bg-[var(--color-hover-overlay)] hover:text-[var(--color-text-primary)] disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150 rounded"
 title="上一集"
  >
- <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
- <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
- </svg>
+ <Icon name="chevron-left" size={16} strokeWidth={2.5} />
  </button>
  <span className="flex items-center text-sm text-[var(--color-text-primary)] min-w-[150px] justify-center">
  <span className="text-white font-medium">{episodeTitle(curIdx)}</span>
@@ -647,9 +644,7 @@ title="上一集"
  className="w-8 flex items-center justify-center hover:bg-[var(--color-hover-overlay)] hover:text-[var(--color-text-primary)] disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150 rounded"
 title="下一集"
  >
- <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
- <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
- </svg>
+ <Icon name="chevron-right" size={16} strokeWidth={2.5} />
  </button>
  </div>
  )}
@@ -666,9 +661,7 @@ title="下一集"
  : 'bg-[var(--color-hover-overlay-subtle)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-hover-overlay)]'
  }`}
  >
- <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
- <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
- </svg>
+ <Icon name="grid" size={16} />
  选集
  </button>
  )}
@@ -680,9 +673,7 @@ className={`flex items-center gap-1.5 px-2.5 text-sm transition-all duration-150
  : 'bg-[var(--color-hover-overlay-subtle)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-hover-overlay)]'
  }`}
  >
- <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
- <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
- </svg>
+ <Icon name="menu" size={16} />
  换源
  {sourceList.length > 1 && (
  <span className="text-[10px] bg-white/20 px-1.5 py-0.5 leading-none rounded">{sourceList.length}</span>
@@ -696,9 +687,7 @@ className={`flex items-center gap-1.5 px-2.5 text-sm transition-all duration-150
  : 'bg-[var(--color-hover-overlay-subtle)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-hover-overlay)]'
  }`}
  >
- <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
- <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
- </svg>
+ <Icon name="help" size={16} />
  详情
  </button>
  {/* 分隔线 */}
@@ -722,9 +711,7 @@ className={`flex items-center gap-1.5 px-2.5 text-sm transition-all duration-150
  ) : error ? (
  <div className="flex flex-col items-center gap-5 max-w-sm text-center">
  <div className="w-16 h-16 bg-red-500/10 flex items-center justify-center ring-1 ring-red-500/20">
- <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
- <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
- </svg>
+ <Icon name="info" size={32} strokeWidth={1.5} className="text-red-400" />
  </div>
  <div>
  <p className="text-[var(--color-text-primary)] text-base font-medium">加载失败</p>
@@ -734,16 +721,14 @@ className={`flex items-center gap-1.5 px-2.5 text-sm transition-all duration-150
  onClick={() => navigate(-1)}
  className="flex items-center gap-1.5 px-5 py-2.5 bg-[var(--color-hover-overlay-strong)] text-[var(--color-text-primary)] hover:bg-[var(--color-hover-overlay-strong)] transition-all rounded"
  >
- <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
- <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
- </svg>
+ <Icon name="chevron-left" size={16} />
  返回
  </button>
  </div>
  ) : noEpisode ? (
  <div className="flex flex-col items-center gap-5 max-w-md text-center">
  <div className="w-20 h-20 bg-gradient-to-br from-primary/20 to-red-700/10 flex items-center justify-center ring-1 ring-primary/20">
- <svg className="w-16 h-16 mx-auto mb-4 text-[var(--color-text-quaternary)] opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.2"><path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5a1.125 1.125 0 01-1.125-1.125M15 5.625h-6m6 0a8.25 8.25 0 016 2.825m-6-2.825v12.75m6-9.925a8.25 8.25 0 016 2.825M3.375 5.625h17.25" /></svg>
+ <Icon name="film" size={64} strokeWidth={1.2} className="mx-auto mb-4 text-[var(--color-text-quaternary)] opacity-40" />
  </div>
  <div>
  <p className="text-[var(--color-text-primary)] text-lg font-medium">该资源暂无播放地址</p>
@@ -757,9 +742,7 @@ className={`flex items-center gap-1.5 px-2.5 text-sm transition-all duration-150
  onClick={() => setPanel('sources')}
  className="btn-primary flex items-center gap-1.5"
  >
- <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
- <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
- </svg>
+ <Icon name="menu" size={16} />
  换个源试试
  </button>
  )}
@@ -802,17 +785,11 @@ className={`flex items-center gap-1.5 px-2.5 text-sm transition-all duration-150
  <div className="px-5 py-4 border-b border-[var(--color-border-subtle)] flex items-center justify-between">
  <div className="flex items-center gap-2">
  {panel === 'episodes' ? (
- <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
- <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
- </svg>
+ <Icon name="grid" size={16} className="text-primary" />
  ) : panel === 'sources' ? (
- <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
- <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
- </svg>
+ <Icon name="menu" size={16} className="text-primary" />
  ) : (
- <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
- <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
- </svg>
+ <Icon name="help" size={16} className="text-primary" />
  )}
  <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
  {panel === 'episodes' ? '选集' : panel === 'sources' ? '换源' : '详情'}
@@ -830,9 +807,7 @@ className={`flex items-center gap-1.5 px-2.5 text-sm transition-all duration-150
  className="w-7 h-7 flex items-center justify-center text-[var(--color-text-tertiary)] hover:text-red-400 hover:bg-red-500/10 transition-all rounded"
  title="关闭面板"
  >
- <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
- <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
- </svg>
+ <Icon name="x" size={16} />
  </button>
  </div>
 
@@ -907,9 +882,7 @@ className={`flex items-center gap-1.5 px-2.5 text-sm transition-all duration-150
  )}
  </div>
  {!isCurrent && epCount > 0 && (
- <svg className="w-4 h-4 text-[var(--color-text-quaternary)] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
- <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
- </svg>
+ <Icon name="arrow-right" size={16} className="text-[var(--color-text-quaternary)] flex-shrink-0" />
  )}
  </div>
  <div className="flex items-center gap-2 mt-2 text-xs">

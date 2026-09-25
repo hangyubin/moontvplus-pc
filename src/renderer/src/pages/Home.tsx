@@ -18,6 +18,8 @@ import {
 import type { CmsVodItem } from '../lib/api'
 import { useGridColumns } from '../lib/useGridColumns'
 import SmartImage from '../components/SmartImage'
+import Icon from '../components/Icon'
+import MediaCard from '../components/MediaCard'
 import type {
   DoubanCategoryItem,
   TmdbTrendingItem,
@@ -550,43 +552,6 @@ interface MediaCardItem {
   year?: string
 }
 
-/** 通用媒体卡片:评分/集数等角标由 badge 自定义 */
-function MediaCard({ item, badge, onClick }: {
-  item: MediaCardItem
-  badge?: ReactNode
-  onClick: () => void
-}) {
-  return (
-    <div
-      onClick={onClick}
-      className="card-hover cursor-pointer overflow-hidden group relative"
-    >
-      <div className="relative aspect-[2/3] bg-[var(--color-card-bg)] overflow-hidden">
-        <SmartImage
-          src={item.poster}
-          alt={item.title}
-          className="w-full h-full transition-transform duration-300 group-hover:scale-[1.08]"
-        />
-        {/* 渐变遮罩 */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-60 group-hover:opacity-95 transition-opacity duration-300 pointer-events-none" />
-        {/* 角标(评分/集数) */}
-        {badge}
-        {/* 悬浮播放按钮 */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none">
-          <div className="w-8 h-8 bg-primary flex items-center justify-center scale-90 group-hover:scale-100 transition-transform duration-300 rounded-full shadow-xl shadow-primary/70">
-            <svg className="w-5 h-5 text-white ml-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 5v14l11-7z" /></svg>
-          </div>
-        </div>
-        {/* 标题叠加在封面底部 */}
-        <div className="absolute bottom-0 left-0 right-0 p-2 pointer-events-none">
-          <p className="text-xs font-medium text-white truncate drop-shadow-md">{item.title}</p>
-          {item.year && <p className="text-[10px] text-white/60 truncate mt-0.5">{item.year}</p>}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 /** 首页分类区块:收起时显示两行,展开后就地无限加载 */
 function CategorySectionView<T extends MediaCardItem>({
   title,
@@ -626,7 +591,12 @@ function CategorySectionView<T extends MediaCardItem>({
               <MediaCard
                 key={String(item.id)}
                 item={item}
-                badge={renderBadge?.(item)}
+                topRight={renderBadge?.(item)}
+                subtitle={
+                  item.year ? (
+                    <p className="text-[10px] text-white/60 truncate mt-0.5">{item.year}</p>
+                  ) : undefined
+                }
                 onClick={() => onItemClick(item)}
               />
             ))}
@@ -693,9 +663,7 @@ function SectionTitle({ children, expanded, onToggle, hasMore }: { children: Rea
           className="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors px-2 py-1 rounded"
         >
           {expanded ? '收起' : '查看更多'}
-          <svg className={`w-3 h-3 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-          </svg>
+          <Icon name="chevron-down" size={12} strokeWidth={2.5} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
         </button>
       )}
     </div>
@@ -798,7 +766,7 @@ export default function Home() {
                 {/* 趋势标签 */}
                 <div className="flex items-center gap-2 mb-2">
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary text-white text-[10px] font-bold tracking-wide rounded" style={{ boxShadow: '0 0 12px var(--color-glow-primary)' }}>
-                    <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z" /></svg>
+                    <Icon name="flame" size={10} />
                     趋势推荐
                   </span>
                 </div>
@@ -826,7 +794,7 @@ export default function Home() {
                   onClick={(e) => { e.stopPropagation(); handleBannerClick(banner) }}
                   className="btn-primary inline-flex items-center gap-2 text-sm"
                 >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                  <Icon name="play" size={16} />
                   立即观看
                 </button>
               </div>

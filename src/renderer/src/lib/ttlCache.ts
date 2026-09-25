@@ -37,19 +37,14 @@ export function getCached<T>(key: string, ttl: number = TTL_24H): T | null {
   }
 }
 
-/** 写入缓存;localStorage 失败(配额/隐私模式)时静默忽略 */
+/** 写入缓存;localStorage 失败(配额/隐私模式)时静默忽略,不清空其他缓存 */
 export function setCached<T>(key: string, value: T, ttl: number = TTL_24H): void {
   try {
     const env: CacheEnvelope<T> = { t: Date.now(), v: value }
     localStorage.setItem(PREFIX + key, JSON.stringify(env))
   } catch {
-    // 配额不足时尝试清理一次本应用的全部缓存再重试
-    try {
-      clearByPrefix('')
-      localStorage.setItem(PREFIX + key, JSON.stringify({ t: Date.now(), v: value } as CacheEnvelope<T>))
-    } catch {
-      // 仍然失败则放弃缓存
-    }
+    // 配额不足/隐私模式:放弃本次写入(由调用方的 LRU/瘦身控制体积),
+    // 不能清空其他业务缓存(如首页),否则会造成连锁缓存失效
   }
 }
 

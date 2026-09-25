@@ -4,7 +4,7 @@
  */
 import { useNavigate } from 'react-router-dom'
 import { useStore, sortedFavorites } from '../lib/store'
-import SmartImage from '../components/SmartImage'
+import MediaCard from '../components/MediaCard'
 import { parseStorageKey } from '../types'
 import type { Favorite } from '../types'
 import { formatRelativeTime } from '../lib/utils'
@@ -85,41 +85,33 @@ export default function Favorites() {
           const completed = favorite.is_completed
 
           return (
-            <div
+            <MediaCard
               key={key}
+              variant="plain"
+              item={{ title: favorite.title, poster: favorite.cover }}
               onClick={() => handleClick(key, favorite)}
-              className="card-hover cursor-pointer overflow-hidden group relative"
               style={{
                 background: 'var(--color-card-bg)',
                 border: '1px solid var(--color-border-subtle)',
               }}
-            >
-              {/* 封面区 */}
-              <div className="relative aspect-[2/3] bg-[var(--color-hover-overlay-subtle)] overflow-hidden">
-                <SmartImage
-                  src={favorite.cover}
-                  alt={favorite.title}
-                  className="w-full h-full"
-                />
-
-                {/* 悬浮查看遮罩 */}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <span
-                    className="w-6 h-6 flex items-center justify-center text-lg text-white rounded-full bg-primary shadow-xl shadow-primary/70"
-                  >
-                    <svg className="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 5v14l11-7z" /></svg>
-                  </span>
-                </div>
-
-                {/* vod_remarks 角标(如"更新至第X集"/"已完结") */}
-                {favorite.vod_remarks && (
+              topLeft={
+                favorite.vod_remarks ? (
                   <span className="absolute top-2 left-2 bg-black/75 text-white text-xs px-2 py-0.5 rounded">
                     {favorite.vod_remarks}
                   </span>
-                )}
-
-                {/* 已完结标记 */}
-                {completed && (
+                ) : undefined
+              }
+              topRight={
+                <button
+                  onClick={(e) => handleRemove(e, key)}
+                  title="取消收藏"
+                  className="absolute top-2 right-2 w-7 h-7 bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80 z-10 rounded"
+                >
+                  ✕
+                </button>
+              }
+              bottomLeft={
+                completed ? (
                   <span
                     className="absolute bottom-2 left-2 text-white text-xs px-2 py-0.5 rounded"
                     style={{
@@ -129,29 +121,20 @@ export default function Favorites() {
                   >
                     已完结
                   </span>
-                )}
-
-                {/* 右上角取消收藏按钮 */}
-                <button
-                  onClick={(e) => handleRemove(e, key)}
-                  title="取消收藏"
-                  className="absolute top-2 right-2 w-7 h-7 bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80 z-10 rounded"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* 信息区 */}
-              <div className="p-2.5">
-                <p className="text-sm text-[var(--color-text-primary)] truncate">{favorite.title}</p>
-                <p className="text-xs text-[var(--color-text-tertiary)] mt-1 truncate">
-                  {favorite.year} · {favorite.source_name}
-                </p>
-                <p className="text-xs text-[var(--color-text-quaternary)] mt-0.5 truncate">
-                  收藏于 {formatRelativeTime(favorite.save_time)}
-                </p>
-              </div>
-            </div>
+                ) : undefined
+              }
+              footer={
+                <div className="p-2.5">
+                  <p className="text-sm text-[var(--color-text-primary)] truncate">{favorite.title}</p>
+                  <p className="text-xs text-[var(--color-text-tertiary)] mt-1 truncate">
+                    {favorite.year} · {favorite.source_name}
+                  </p>
+                  <p className="text-xs text-[var(--color-text-quaternary)] mt-0.5 truncate">
+                    收藏于 {formatRelativeTime(favorite.save_time)}
+                  </p>
+                </div>
+              }
+            />
           )
         })}
       </div>

@@ -4,6 +4,15 @@ import fs from 'fs'
 
 let mainWindow: BrowserWindow | null = null
 
+/** 录制会话:recordId → 下载控制器 */
+interface RecordingSession {
+  controller: AbortController
+  filePath: string
+  channelName: string
+  startTime: number
+}
+const recordingSessions = new Map<string, RecordingSession>()
+
 /**
  * 自定义视频源播放防盗链表:hostname -> { referer, ua }
  * 渲染层播放某采集源视频前,通过 IPC 注册 m3u8 域名对应的 Referer/UA,
@@ -271,6 +280,115 @@ app.whenReady().then(() => {
       return true
     }
   )
+
+  /* ============ 直播录制 ============
+   * 渲染层发起录制请求后,主进程用 fetch 流式下载并写入文件。
+   * 使用 webContents.fetch 自动携带已注入的防盗链头(Referer/UA)。
+   * 支持 m3u8(仅录制 master playlist 内容)和 flv/mp4 等直链(流式写入)。
+   */
+  ipcMain.handle(
+    'live:startRecording',
+    async (_e, payload: { recordId: string; url: string; channelName: string }) => {
+      const { recordId, url, channelName } = payload
+      if (recordingSessions.has(recordId)) {
+        return { ok: false, error: '录制会话已存在' }
+      }
+      const controller = new AbortController()
+      // 保存目录: 用户视频目录/直播录制
+      const videosPath = app.getPath('videos')
+      const recordDir = join(videosPath, '直播录制')
+      try {
+        if (!fs.existsSync(recordDir)) fs.mkdirSync(recordDir, { recursive: true })
+      } catch (e) {
+        return { ok: false, error: `无法创建录制目录: ${(e as Error)?.message}` }
+      }
+      const safeName = channelName.replace(/[\\/:*?"<>|]/g, '_')
+      const ext = url.includes('.flv') ? '.flv' : url.includes('.mp4') ? '.mp4' : '.ts'
+      const filePath = join(recordDir, `${safeName}_${Date.now()}${ext}`)
+      const session: RecordingSession = { controller, filePath, channelName, startTime: Date.now() }
+      recordingSessions.set(recordId, session)
+
+      // 异步启动下载(不阻塞 IPC 返回)
+      ;(async () => {
+        try {
+          const res = await fetch(url, { signal: controller.signal })
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          if (!res.body) throw new Error('响应无 body')
+
+          const writer = fs.createWriteStream(filePath, { flags: 'wx' })
+          const reader = res.body.getReader()
+          let bytes = 0
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            if (value) {
+              writer.write(Buffer.from(value))
+              bytes += value.byteLength
+              // 定期向渲染层汇报进度
+              if (bytes % (1024 * 512) < 65536) {
+                try {
+                  mainWindow?.webContents.send('live:recordingProgress', { recordId, bytes, filePath })
+                } catch {}
+              }
+            }
+          }
+          writer.end()
+          mainWindow?.webContents.send('live:recordingComplete', { recordId, filePath, bytes })
+        } catch (err: any) {
+          if (err?.name === 'AbortError') {
+            mainWindow?.webContents.send('live:recordingStopped', { recordId, filePath })
+          } else {
+            mainWindow?.webContents.send('live:recordingError', {
+              recordId,
+              error: err?.message || '下载失败',
+              filePath
+            })
+          }
+        } finally {
+          recordingSessions.delete(recordId)
+        }
+      })()
+
+      return { ok: true, filePath }
+    }
+  )
+
+  ipcMain.handle('live:stopRecording', (_e, recordId: string) => {
+    const s = recordingSessions.get(recordId)
+    if (!s) return { ok: false, error: '录制会话不存在' }
+    s.controller.abort()
+    return { ok: true, filePath: s.filePath }
+  })
+
+  ipcMain.handle('live:getRecordingStatus', (_e, recordId: string) => {
+    const s = recordingSessions.get(recordId)
+    if (!s) return { recording: false }
+    return { recording: true, filePath: s.filePath, startTime: s.startTime, channelName: s.channelName }
+  })
+
+  ipcMain.handle('live:listRecordings', () => {
+    try {
+      const recordDir = join(app.getPath('videos'), '直播录制')
+      if (!fs.existsSync(recordDir)) return []
+      const files = fs.readdirSync(recordDir).filter((f) => /\.(ts|flv|mp4)$/i.test(f))
+      return files.map((f) => ({
+        name: f,
+        path: join(recordDir, f),
+        size: fs.statSync(join(recordDir, f)).size,
+        mtime: fs.statSync(join(recordDir, f)).mtimeMs
+      })).sort((a, b) => b.mtime - a.mtime)
+    } catch {
+      return []
+    }
+  })
+
+  ipcMain.handle('live:openRecordingFolder', () => {
+    const recordDir = join(app.getPath('videos'), '直播录制')
+    if (!fs.existsSync(recordDir)) fs.mkdirSync(recordDir, { recursive: true })
+    shell.openPath(recordDir)
+    return recordDir
+  })
 
   // 合并为单个 onBeforeSendHeaders 监听器
   // (Electron 文档:只有最后一个 listener 生效,不能注册多个)
