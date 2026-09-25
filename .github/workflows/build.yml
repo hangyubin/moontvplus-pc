@@ -1,0 +1,110 @@
+name: Build Windows & Linux
+
+on:
+  # 推送 tag 时触发编译并发布 Release
+  push:
+    tags:
+      - 'v*'
+  # 支持手动触发
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build Windows installer
+        run: npm run dist:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoonTVPlus-Windows
+          path: |
+            dist/*.exe
+            dist/*.exe.blockmap
+          retention-days: 30
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: MoonTVPlus ${{ github.ref_name }}
+          body: |
+            ## MoonTVPlus PC ${{ github.ref_name }}
+
+            ### 下载安装
+
+            - **Windows**: 下载 `MoonTVPlus-*.exe`,双击安装即可
+            - **Linux**: 下载 `MoonTVPlus-*.AppImage`,添加执行权限后运行
+
+            ### 功能
+
+            - 影视播放:多源聚合搜索、播放记忆、开灯关灯模式
+            - 直播电视:多直播源、频道分组、线路切换、换台
+            - 音乐播放:多音源、卡拉OK歌词、播放历史
+            - 观看历史多端同步、收藏夹
+
+            ### 系统要求
+
+            - Windows 10/11 (64位) 或 Linux (x64)
+            - 需要配合 MoonTVPlus 服务端使用
+          files: |
+            dist/*.exe
+            dist/*.exe.blockmap
+            dist/*.AppImage
+          draft: false
+          prerelease: false
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build Linux AppImage
+        run: npm run dist:linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoonTVPlus-Linux
+          path: |
+            dist/*.AppImage
+          retention-days: 30

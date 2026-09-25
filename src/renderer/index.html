@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="../../build/icon.png" />
+    <title>MoonTVPlus</title>
+    <!--
+      Electron 桌面应用无需严格的 CSP(本地运行,非 Web)。
+      此 CSP 仅做基本约束,允许跨域加载图片/视频/API。
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src * data: blob: 'unsafe-inline' 'unsafe-eval' ws: wss: http: https: file:; img-src * data: blob: http: https: file:; media-src * data: blob: http: https: file:; connect-src * ws: wss: http: https: file:;"
+    />
+  </head>
+  <body class="bg-surface text-gray-100">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

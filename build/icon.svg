@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- Background gradient: deep cosmic -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1033"/>
+      <stop offset="50%" stop-color="#0d0820"/>
+      <stop offset="100%" stop-color="#050310"/>
+    </linearGradient>
+
+    <!-- Moon gradient: vibrant blue to purple to pink -->
+    <linearGradient id="moonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5B8FFF"/>
+      <stop offset="40%" stop-color="#7B5FFF"/>
+      <stop offset="75%" stop-color="#A855F7"/>
+      <stop offset="100%" stop-color="#EC4899"/>
+    </linearGradient>
+
+    <!-- Play button gradient -->
+    <linearGradient id="playGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F0F0FF"/>
+    </linearGradient>
+
+    <!-- Top highlight -->
+    <linearGradient id="topHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.12"/>
+      <stop offset="60%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Moon outer glow -->
+    <filter id="moonGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="20" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Play button glow -->
+    <filter id="playGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Crescent mask: outer circle minus offset inner circle -->
+    <mask id="crescentMask">
+      <rect width="1024" height="1024" fill="black"/>
+      <circle cx="520" cy="512" r="300" fill="white"/>
+      <circle cx="400" cy="420" r="260" fill="black"/>
+    </mask>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect width="1024" height="1024" rx="220" ry="220" fill="url(#bgGrad)"/>
+
+  <!-- Subtle stars -->
+  <circle cx="180" cy="160" r="3" fill="#7B5FFF" opacity="0.5"/>
+  <circle cx="850" cy="200" r="2.5" fill="#A855F7" opacity="0.4"/>
+  <circle cx="800" cy="820" r="3" fill="#5B8FFF" opacity="0.35"/>
+  <circle cx="160" cy="780" r="2" fill="#EC4899" opacity="0.3"/>
+  <circle cx="900" cy="560" r="2" fill="#7B5FFF" opacity="0.25"/>
+  <circle cx="120" cy="430" r="1.5" fill="#A855F7" opacity="0.25"/>
+  <circle cx="520" cy="100" r="1.5" fill="#5B8FFF" opacity="0.2"/>
+  <circle cx="680" cy="880" r="2" fill="#EC4899" opacity="0.2"/>
+  <circle cx="300" cy="250" r="1.5" fill="#7B5FFF" opacity="0.15"/>
+  <circle cx="750" cy="450" r="1" fill="#A855F7" opacity="0.15"/>
+
+  <!-- Crescent moon body with glow -->
+  <g filter="url(#moonGlow)">
+    <rect width="1024" height="1024" fill="url(#moonGrad)" mask="url(#crescentMask)"/>
+  </g>
+
+  <!-- Moon top highlight -->
+  <rect width="1024" height="1024" fill="url(#topHighlight)" mask="url(#crescentMask)"/>
+
+  <!-- Play button (positioned in crescent opening) -->
+  <g filter="url(#playGlow)">
+    <path d="M 545 380 L 545 644 Q 545 668 566 656 L 805 514 Q 828 500 805 486 L 566 358 Q 545 346 545 380 Z" fill="url(#playGrad)"/>
+  </g>
+
+  <!-- Play button subtle inner gradient overlay -->
+  <path d="M 562 408 L 562 616 Q 562 630 572 624 L 776 510 Q 788 502 776 494 L 572 398 Q 562 392 562 408 Z" fill="url(#moonGrad)" opacity="0.1"/>
+
+  <!-- Play button top edge highlight -->
+  <path d="M 562 408 L 562 422 Q 562 416 572 414 L 776 502 Q 781 504 781 508 L 781 492 Q 781 486 776 488 L 572 398 Q 562 392 562 408 Z" fill="#FFFFFF" opacity="0.25"/>
+</svg>

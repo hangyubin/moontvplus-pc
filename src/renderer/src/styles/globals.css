@@ -1,0 +1,763 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ================================================================
+   DESIGN SYSTEM v3 — Refined Cinema
+   深色:极致深邃黑 + Netflix 红,注重层次和呼吸感
+   浅色:清爽蓝白,注重对比度和可读性
+   ================================================================ */
+
+/* ============ CSS 变量:深色主题(默认) ============ */
+:root,
+[data-theme='dark'] {
+  /* 主色:Netflix 红 */
+  --color-primary: #e50914;
+  --color-primary-light: #ff2d3f;
+  --color-primary-dark: #b00710;
+
+  /* 多层背景:极致深邃,层次分明 */
+  --color-app-bg: #0a0a0d;
+  --color-app-bg-deep: #060608;
+  --color-sidebar-bg: #0d0d11;
+  --color-panel-bg: #131318;
+  --color-card-bg: #18181f;
+  --color-card-hover: #1e1e26;
+  --color-elevated: #22222b;
+
+  /* 悬浮叠层 */
+  --color-hover-overlay: rgba(255, 255, 255, 0.04);
+  --color-hover-overlay-strong: rgba(255, 255, 255, 0.08);
+  --color-hover-overlay-subtle: rgba(255, 255, 255, 0.02);
+
+  /* 边框 */
+  --color-border-subtle: rgba(255, 255, 255, 0.04);
+  --color-border-default: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.12);
+
+  /* 文字:5级层次 */
+  --color-text-primary: #f0f0f3;
+  --color-text-secondary: #a0a0ab;
+  --color-text-tertiary: #65656f;
+  --color-text-quaternary: #3e3e46;
+  --color-text-faint: #28282e;
+
+  /* 渐变 */
+  --color-gradient-from: rgba(10, 10, 13, 0.95);
+  --color-gradient-via: rgba(10, 10, 13, 0.5);
+  --color-gradient-to: transparent;
+
+  /* 遮罩 */
+  --color-mask-bg: rgba(0, 0, 0, 0.8);
+
+  /* 图片占位 */
+  --color-img-placeholder: rgba(255, 255, 255, 0.02);
+
+  /* 滚动条 */
+  --color-scrollbar-track: transparent;
+  --color-scrollbar-thumb: rgba(255, 255, 255, 0.08);
+
+  /* 输入框 */
+  --color-input-bg: rgba(255, 255, 255, 0.04);
+
+  /* 毛玻璃 */
+  --color-glass-bg: rgba(13, 13, 17, 0.8);
+
+  /* 辉光 */
+  --color-glow-primary: rgba(229, 9, 20, 0.3);
+  --color-glow-primary-strong: rgba(229, 9, 20, 0.45);
+
+  /* 阴影系统 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 3px 10px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.6);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 12px 36px rgba(0, 0, 0, 0.5);
+  --shadow-primary: 0 4px 16px rgba(229, 9, 20, 0.2);
+
+  /* 圆角系统:分层圆角策略(增大值,更圆润) */
+  --radius-card: 10px;      /* 视频卡片/封面 */
+  --radius-button: 8px;     /* 按钮 */
+  --radius-input: 8px;      /* 输入框 */
+  --radius-badge: 4px;      /* 角标/Badge */
+  --radius-panel: 12px;     /* 面板/卡片容器 */
+  --radius-chip: 8px;       /* Chip 标签 */
+}
+
+/* ============ CSS 变量:浅色主题 ============ */
+[data-theme='light'] {
+  --color-primary: #2563eb;
+  --color-primary-light: #3b82f6;
+  --color-primary-dark: #1d4ed8;
+
+  --color-app-bg: #e8eaf0;
+  --color-app-bg-deep: #dde0e8;
+  --color-sidebar-bg: #ffffff;
+  --color-panel-bg: #ffffff;
+  --color-card-bg: #ffffff;
+  --color-card-hover: #f5f7fa;
+  --color-elevated: #ffffff;
+
+  --color-hover-overlay: rgba(37, 99, 235, 0.04);
+  --color-hover-overlay-strong: rgba(37, 99, 235, 0.08);
+  --color-hover-overlay-subtle: rgba(0, 0, 0, 0.015);
+
+  --color-border-subtle: rgba(0, 0, 0, 0.05);
+  --color-border-default: rgba(0, 0, 0, 0.09);
+  --color-border-strong: rgba(0, 0, 0, 0.14);
+
+  --color-text-primary: #14141a;
+  --color-text-secondary: #383843;
+  --color-text-tertiary: #585864;
+  --color-text-quaternary: #85858f;
+  --color-text-faint: #b0b0b8;
+
+  --color-gradient-from: rgba(232, 234, 240, 0.95);
+  --color-gradient-via: rgba(232, 234, 240, 0.5);
+  --color-gradient-to: transparent;
+
+  --color-mask-bg: rgba(255, 255, 255, 0.85);
+  --color-img-placeholder: rgba(0, 0, 0, 0.025);
+
+  --color-scrollbar-track: transparent;
+  --color-scrollbar-thumb: rgba(37, 99, 235, 0.15);
+
+  --color-input-bg: rgba(37, 99, 235, 0.025);
+
+  --color-glass-bg: rgba(255, 255, 255, 0.8);
+  --color-glow-primary: rgba(37, 99, 235, 0.25);
+  --color-glow-primary-strong: rgba(37, 99, 235, 0.4);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 3px 10px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.1);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.1);
+  --shadow-primary: 0 4px 16px rgba(37, 99, 235, 0.15);
+
+  /* 圆角系统:与深色主题一致 */
+  --radius-card: 10px;
+  --radius-button: 8px;
+  --radius-input: 8px;
+  --radius-badge: 4px;
+  --radius-panel: 12px;
+  --radius-chip: 8px;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ============ 全局基础样式 ============ */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ============ 圆角策略:分层圆角 ============ */
+/*
+ * 默认:HTML 元素 border-radius 为 0(无需全局重置)
+ *
+ * 组件类通过 CSS 变量设置圆角(优先级高于 Tailwind @layer):
+ *   .card-hover   → 10px (卡片)
+ *   .btn-primary  → 8px  (主按钮)
+ *   .btn-ghost    → 8px  (幽灵按钮)
+ *   .input-field  → 8px  (输入框)
+ *   .badge        → 4px  (角标)
+ *   .chip         → 8px  (标签)
+ *   .glass-panel  → 12px (毛玻璃面板)
+ *   .toggle       → 药丸形(全圆角)
+ *
+ * Tailwind 圆角类(rounded-sm/rounded/rounded-md/rounded-lg/rounded-full)可正常使用
+ *
+ * 强制直角的元素(用 !important):
+ *   播放器视频区域(video)、窗口控制按钮(Win10 风格)
+ * 播放器控件(进度条/音量条/按钮)使用圆角:药丸形轨道 + 圆形手柄
+ */
+
+/* 视频卡片/封面: 10px */
+.card-hover {
+  border-radius: var(--radius-card);
+}
+
+/* 按钮(组件类): 4px */
+.btn-primary {
+  border-radius: var(--radius-button);
+}
+.btn-ghost {
+  border-radius: var(--radius-button);
+}
+
+/* 输入框: 4px */
+.input-field {
+  border-radius: var(--radius-input);
+}
+
+/* 角标/Badge: 2px */
+.badge,
+.badge-primary,
+.badge-gold {
+  border-radius: var(--radius-badge);
+}
+
+/* Chip 标签: 4px */
+.chip,
+.chip-active {
+  border-radius: var(--radius-chip);
+}
+
+/* 毛玻璃面板: 8px */
+.glass-panel {
+  border-radius: var(--radius-panel);
+}
+
+/* 播放器视频区域 + 遮罩:强制直角(控件保持圆角) */
+video {
+  border-radius: 0 !important;
+}
+
+/* ================================================================
+   Artplayer 控件圆角样式
+   进度条:药丸形轨道 + 圆形手柄
+   音量条:药丸形轨道 + 圆形手柄
+   ================================================================ */
+
+/* 进度条轨道 */
+.art-progress,
+.art-progress-inner,
+.art-progress-loaded,
+.art-progress-played {
+  border-radius: 9999px !important;
+}
+
+/* 进度条拖动手柄:圆形 */
+.art-progress-indicator,
+.art-progress-handle {
+  border-radius: 50% !important;
+}
+
+/* 进度条悬停时的提示气泡 */
+.art-progress-tip {
+  border-radius: 6px !important;
+}
+
+/* 音量滑块轨道 */
+.art-volume-slider,
+.art-volume-panel,
+.art-volume-inner,
+.art-volume-loaded,
+.art-volume-played {
+  border-radius: 9999px !important;
+}
+
+/* 音量滑块手柄:圆形 */
+.art-volume-indicator,
+.art-volume-handle {
+  border-radius: 50% !important;
+}
+
+/* 播放器内部控制按钮:圆形 */
+.art-controls .art-control,
+.art-controls .art-control-icon {
+  border-radius: 50% !important;
+}
+
+/* 设置面板等弹出层 */
+.art-settings,
+.art-info {
+  border-radius: 8px !important;
+}
+
+/* 窗口控制按钮:强制直角(Win10 原生风格) */
+.window-controls,
+.window-controls * {
+  border-radius: 0 !important;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif;
+  background-color: var(--color-app-bg);
+  color: var(--color-text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ================================================================
+   Spinner
+   ================================================================ */
+.spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid var(--color-border-default);
+  border-top-color: var(--color-primary);
+  animation: spin 0.6s linear infinite;
+}
+.spinner-sm { width: 0.875rem; height: 0.875rem; border-width: 2px; }
+.spinner-lg { width: 2.25rem; height: 2.25rem; border-width: 3px; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ================================================================
+   Buttons
+   ================================================================ */
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  color: #fff;
+  font-weight: 600;
+  padding: 0.5rem 1.5rem;
+  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: var(--shadow-primary);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent 50%);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.btn-primary:hover::before { opacity: 1; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px var(--color-glow-primary-strong); }
+.btn-primary:active { transform: scale(0.97); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; transform: none; }
+.btn-primary:disabled::before { display: none; }
+
+.btn-ghost {
+  background: var(--color-hover-overlay);
+  color: var(--color-text-secondary);
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--color-border-subtle);
+  transition: all 0.15s;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-ghost:hover {
+  background: var(--color-hover-overlay-strong);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-default);
+}
+
+/* ================================================================
+   Inputs
+   ================================================================ */
+.input-field {
+  width: 100%;
+  background: var(--color-input-bg);
+  border: 1px solid var(--color-border-subtle);
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.input-field:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-glow-primary);
+  background: var(--color-card-bg);
+}
+.input-field::placeholder { color: var(--color-text-quaternary); }
+
+/* ================================================================
+   Badges
+   ================================================================ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 6px;
+  line-height: 1;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-weight: 600;
+}
+.badge-primary { background: var(--color-primary); color: #fff; }
+.badge-gold { background: rgba(0, 0, 0, 0.75); color: #facc15; }
+
+/* ================================================================
+   Chips
+   ================================================================ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  background: var(--color-hover-overlay-subtle);
+  color: var(--color-text-tertiary);
+  transition: all 0.15s;
+  cursor: pointer;
+  white-space: nowrap;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+.chip:hover {
+  background: var(--color-hover-overlay);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-subtle);
+}
+.chip-active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+/* ================================================================
+   Section Bar
+   ================================================================ */
+.section-bar {
+  display: inline-block;
+  width: 3px;
+  height: 14px;
+  background: var(--color-primary);
+  vertical-align: middle;
+  box-shadow: 0 0 6px var(--color-glow-primary);
+}
+
+/* ================================================================
+   Toggle Switch (药丸形 / Pill-shaped)
+   ================================================================ */
+.toggle {
+  position: relative;
+  display: inline-flex;
+  height: 24px;
+  width: 44px;
+  align-items: center;
+  border-radius: 9999px;
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+.toggle-on { background: var(--color-primary); box-shadow: 0 0 8px var(--color-glow-primary); }
+.toggle-on-red { background: #dc2626; box-shadow: 0 0 8px rgba(220, 38, 38, 0.3); }
+.toggle-off { background: var(--color-hover-overlay-strong); }
+.toggle-knob {
+  position: absolute;
+  display: inline-block;
+  height: 20px;
+  width: 20px;
+  background: #fff;
+  border-radius: 50%;
+  transition: left 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.toggle-knob-on { left: 22px; }
+.toggle-knob-off { left: 2px; }
+
+/* ================================================================
+   滚动条
+   ================================================================ */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-scrollbar-thumb); transition: background 0.2s; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
+
+/* ================================================================
+   音量滑块 (input[type="range"] 自定义样式)
+   药丸形轨道 + 圆形旋钮
+   ================================================================ */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 9999px !important;
+  background: var(--color-hover-overlay-strong);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50% !important;
+  background: #fff;
+  margin-top: -4px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  border: 2px solid var(--color-primary);
+  transition: transform 0.15s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.1);
+}
+
+/* ================================================================
+   文字截断
+   ================================================================ */
+.line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-4 { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ================================================================
+   动画
+   ================================================================ */
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-slideInRight { animation: slideInRight 0.25s ease-out; }
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-slideInLeft { animation: slideInLeft 0.25s ease-out; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-10px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-toast-in { animation: toastIn 0.22s cubic-bezier(0.21, 1.02, 0.73, 1); }
+
+@keyframes eq {
+  from { transform: scaleY(0.3); }
+  to { transform: scaleY(1); }
+}
+
+/* 歌词滚动条 */
+.lyric-scroll::-webkit-scrollbar { width: 3px; }
+.lyric-scroll::-webkit-scrollbar-track { background: transparent; }
+.lyric-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); }
+.lyric-scroll::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
+
+/* ================================================================
+   卡片悬浮效果
+   ================================================================ */
+.card-hover {
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: var(--shadow-card);
+}
+.card-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+/* ================================================================
+   进度条
+   ================================================================ */
+.progress-bar {
+  background: linear-gradient(to right, var(--color-primary), var(--color-primary-light));
+  transition: width 0.3s ease;
+  box-shadow: 0 0 4px var(--color-glow-primary);
+}
+
+/* ================================================================
+   毛玻璃效果
+   ================================================================ */
+.glass {
+  background-color: var(--color-glass-bg);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+}
+
+.glass-panel {
+  background-color: var(--color-glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--color-border-subtle);
+}
+
+/* ================================================================
+   文字辉光
+   ================================================================ */
+.glow-text {
+  text-shadow: 0 0 10px var(--color-glow-primary), 0 0 20px var(--color-glow-primary);
+}
+
+/* ================================================================
+   脉动辉光
+   ================================================================ */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--color-glow-primary); }
+  50% { box-shadow: 0 0 12px 3px var(--color-glow-primary); }
+}
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+
+/* ================================================================
+   骨架屏闪光
+   ================================================================ */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg,
+    var(--color-img-placeholder) 25%,
+    var(--color-hover-overlay-subtle) 50%,
+    var(--color-img-placeholder) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* 图片占位(排除 Artplayer) */
+img:not(.art-video-player *):not(.art-mask *) {
+  background-color: var(--color-img-placeholder);
+}
+
+/* ================================================================
+   渐变文字
+   ================================================================ */
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ================================================================
+   浅色主题覆盖
+   ================================================================ */
+
+/* --- 文字颜色 --- */
+[data-theme='light'] .text-white {
+  color: var(--color-text-primary) !important;
+}
+[data-theme='light'] [class*="bg-black\/"].text-white,
+[data-theme='light'] [class*="bg-gradient-to-t"].text-white,
+[data-theme='light'] [class*="bg-gradient-to-b"].text-white,
+[data-theme='light'] [class*="bg-gradient-to-r"].text-white,
+[data-theme='light'] .bg-primary.text-white,
+[data-theme='light'] [class*="bg-primary\/"].text-white,
+[data-theme='light'] .bg-red-500.text-white,
+[data-theme='light'] [class*="bg-red-500\/"].text-white {
+  color: #ffffff !important;
+}
+
+[data-theme='light'] .text-gray-300 { color: var(--color-text-secondary) !important; }
+[data-theme='light'] .text-gray-400 { color: var(--color-text-secondary) !important; }
+[data-theme='light'] .text-gray-500 { color: var(--color-text-tertiary) !important; }
+[data-theme='light'] .text-gray-600 { color: var(--color-text-quaternary) !important; }
+[data-theme='light'] .text-gray-700 { color: var(--color-text-quaternary) !important; }
+
+/* --- 背景色 --- */
+[data-theme='light'] .bg-black { background-color: var(--color-app-bg) !important; }
+[data-theme='light'] .bg-\[\#0a0a14\] { background-color: var(--color-app-bg) !important; }
+[data-theme='light'] .bg-\[\#070710\] { background-color: var(--color-app-bg-deep) !important; }
+[data-theme='light'] .bg-\[\#0f0f1e\] { background-color: var(--color-sidebar-bg) !important; }
+[data-theme='light'] .bg-\[\#15152a\],
+[data-theme='light'] .bg-\[\#1a1a2e\] { background-color: var(--color-panel-bg) !important; }
+[data-theme='light'] .bg-\[\#0a0a18\] { background-color: var(--color-panel-bg) !important; }
+
+/* --- 白色半透明叠层 --- */
+[data-theme='light'] .bg-white\/\[0\.03\] { background-color: var(--color-hover-overlay-subtle) !important; }
+[data-theme='light'] .bg-white\/\[0\.04\] { background-color: var(--color-hover-overlay-subtle) !important; }
+[data-theme='light'] .bg-white\/\[0\.05\] { background-color: var(--color-hover-overlay) !important; }
+[data-theme='light'] .bg-white\/\[0\.06\] { background-color: var(--color-hover-overlay) !important; }
+[data-theme='light'] .bg-white\/\[0\.08\] { background-color: var(--color-hover-overlay-strong) !important; }
+[data-theme='light'] .bg-white\/\[0\.1\] { background-color: var(--color-hover-overlay-strong) !important; }
+[data-theme='light'] .bg-white\/5 { background-color: var(--color-hover-overlay-subtle) !important; }
+[data-theme='light'] .bg-white\/10 { background-color: var(--color-hover-overlay) !important; }
+[data-theme='light'] .bg-white\/20 { background-color: var(--color-hover-overlay-strong) !important; }
+
+/* --- 边框 --- */
+[data-theme='light'] .border-white\/\[0\.03\] { border-color: var(--color-border-subtle) !important; }
+[data-theme='light'] .border-white\/\[0\.04\] { border-color: var(--color-border-subtle) !important; }
+[data-theme='light'] .border-white\/\[0\.06\] { border-color: var(--color-border-subtle) !important; }
+[data-theme='light'] .border-white\/\[0\.08\] { border-color: var(--color-border-default) !important; }
+[data-theme='light'] .border-white\/\[0\.1\] { border-color: var(--color-border-strong) !important; }
+[data-theme='light'] .border-white\/10 { border-color: var(--color-border-strong) !important; }
+[data-theme='light'] .border-white\/20 { border-color: var(--color-border-strong) !important; }
+
+/* --- ring --- */
+[data-theme='light'] .ring-white\/5 { --tw-ring-color: var(--color-border-subtle) !important; }
+[data-theme='light'] .ring-white\/10 { --tw-ring-color: var(--color-border-default) !important; }
+[data-theme='light'] .ring-white\/\[0\.06\] { --tw-ring-color: var(--color-border-subtle) !important; }
+
+/* --- shadow --- */
+[data-theme='light'] .shadow-primary\/20 { --tw-shadow-color: rgba(37, 99, 235, 0.12) !important; }
+[data-theme='light'] .shadow-primary\/25 { --tw-shadow-color: rgba(37, 99, 235, 0.12) !important; }
+[data-theme='light'] .shadow-primary\/30 { --tw-shadow-color: rgba(37, 99, 235, 0.15) !important; }
+[data-theme='light'] .shadow-primary\/50 { --tw-shadow-color: rgba(37, 99, 235, 0.2) !important; }
+
+/* --- placeholder --- */
+[data-theme='light'] .placeholder-gray-700::placeholder,
+[data-theme='light'] .placeholder-gray-600::placeholder {
+  color: var(--color-text-quaternary) !important;
+}
+
+/* --- 焦点背景 --- */
+[data-theme='light'] .focus\:bg-white\/\[0\.08\]:focus { background-color: var(--color-hover-overlay-strong) !important; }
+[data-theme='light'] .focus\:bg-white\/\[0\.12\]:focus { background-color: var(--color-hover-overlay-strong) !important; }
+
+/* --- hover 背景 --- */
+[data-theme='light'] .hover\:bg-white\/\[0\.08\]:hover { background-color: var(--color-hover-overlay) !important; }
+[data-theme='light'] .hover\:bg-white\/\[0\.1\]:hover { background-color: var(--color-hover-overlay-strong) !important; }
+[data-theme='light'] .hover\:bg-white\/\[0\.12\]:hover { background-color: var(--color-hover-overlay-strong) !important; }
+[data-theme='light'] .hover\:bg-white\/5:hover { background-color: var(--color-hover-overlay-subtle) !important; }
+[data-theme='light'] .hover\:bg-white\/10:hover { background-color: var(--color-hover-overlay) !important; }
+[data-theme='light'] .hover\:bg-white\/15:hover { background-color: var(--color-hover-overlay-strong) !important; }
+[data-theme='light'] .hover\:bg-white\/20:hover { background-color: var(--color-hover-overlay-strong) !important; }
+
+/* --- hover 文字 --- */
+[data-theme='light'] .hover\:text-white:hover { color: var(--color-text-primary) !important; }
+[data-theme='light'] .hover\:text-gray-300:hover { color: var(--color-text-secondary) !important; }
+
+/* --- disabled --- */
+[data-theme='light'] .disabled\:opacity-20:disabled { opacity: 0.4 !important; }
+[data-theme='light'] .disabled\:opacity-30:disabled { opacity: 0.4 !important; }
+
+/* --- Artplayer 浅色模式保持深色 --- */
+[data-theme='light'] .art-video-player,
+[data-theme='light'] .art-video-player * { color: #fff !important; }
+
+/* --- 图片覆盖层文字保持白色 --- */
+[data-theme='light'] .drop-shadow-md.text-white,
+[data-theme='light'] .drop-shadow-lg.text-white,
+[data-theme='light'] .drop-shadow.text-white { color: #ffffff !important; }
+[data-theme='light'] .bg-primary\/90 .text-white,
+[data-theme='light'] .bg-primary\/80 .text-white { color: #ffffff !important; }
+
+/* --- bg-black/10 面板背景 --- */
+[data-theme='light'] .bg-black\/10 { background-color: var(--color-panel-bg) !important; }
+
+/* ================================================================
+   浅色主题:沉浸式播放页(Live/Play)保持深色
+   ================================================================ */
+[data-theme='light'] .dark-lock { background-color: #000 !important; color: #fff !important; }
+[data-theme='light'] .dark-lock .bg-black { background-color: #000 !important; }
+[data-theme='light'] .dark-lock .text-white { color: #fff !important; }
+[data-theme='light'] .dark-lock .text-white\/80 { color: rgba(255, 255, 255, 0.8) !important; }
+[data-theme='light'] .dark-lock .text-white\/60 { color: rgba(255, 255, 255, 0.6) !important; }
+[data-theme='light'] .dark-lock .text-white\/50 { color: rgba(255, 255, 255, 0.5) !important; }
+[data-theme='light'] .dark-lock .text-white\/40 { color: rgba(255, 255, 255, 0.4) !important; }
+[data-theme='light'] .dark-lock .text-white\/30 { color: rgba(255, 255, 255, 0.3) !important; }
+[data-theme='light'] .dark-lock .placeholder-white\/40::placeholder { color: rgba(255, 255, 255, 0.4) !important; }
+
+/* --- 对比度修复 --- */
+[data-theme='light'] .text-red-300 { color: #dc2626 !important; }
+[data-theme='light'] .text-green-400 { color: #16a34a !important; }
+[data-theme='light'] .text-emerald-500 { color: #059669 !important; }
+[data-theme='light'] .bg-emerald-500 { background-color: #059669 !important; }
+[data-theme='light'] .text-amber-400 { color: #d97706 !important; }
+[data-theme='light'] .text-yellow-400 { color: #ca8a04 !important; }
