@@ -209,24 +209,17 @@ export async function getMusicUrlFromServer(song: MusicSong, quality = '320k'): 
 /**
  * 获取歌词
  * - moontvplus 服务器模式: 走 /api/music/v2/lyric
- * - 自定义源模式: GET lxserver /api/music/lyric?source=&songmid=&name=&singer=...
+ * - 自定义源模式: POST lxserver /api/music/lyric(官方 API 文档要求 POST,原 GET 会导致 404)
  */
 export async function getMusicLyric(song: MusicSong): Promise<MusicLyric> {
   if (hasCustomMusic()) {
-    const params = new URLSearchParams({
-      source: song.source || '',
-      songmid: song.songmid || song.songId || '',
-      name: song.name || '',
-      singer: song.artist || '',
-      hash: song.hash || '',
-      interval: song.durationText || '',
-      copyrightId: song.copyrightId || '',
-      albumId: song.albumId || '',
-      lrcUrl: song.lrcUrl || '',
-      mrcUrl: song.mrcUrl || '',
-      trcUrl: song.trcUrl || '',
+    // LX Server 文档: POST /api/music/lyric,Body 与搜索返回的歌曲字段一致
+    const songInfo = song.raw ?? song
+    const data = await customMusicFetch('/api/music/lyric', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(songInfo),
     })
-    const data = await customMusicFetch(`/api/music/lyric?${params.toString()}`)
     const lyric = data?.lyric || data?.lrc || ''
     if (lyric) {
       return {
@@ -348,11 +341,18 @@ export async function getHotSearch(source = 'kw'): Promise<Array<{ keyword: stri
 }
 
 /**
- * 自定义音乐源原生榜单
- * lxserver 无排行榜 API,直连网易云官方 Toplist API 获取真实榜单
- * (网易云 API 无需鉴权,Electron 主进程已注入 CORS *,可直接请求)
- * 榜单歌曲通过 lxserver /api/music/url 播放(网易云渠道,实测可用)
+ * 自定义音乐源榜单
+ * 新版 lxserver 提供排行榜 API(覆盖 kw/kg/tx/wy/mg 各平台真实榜单):
+ * - 榜单列表: GET /api/music/leaderboard/boards?source=xxx → { list: [{ id, name, bangid }] }
+ * - 榜单歌曲: GET /api/music/leaderboard/list?source=xxx&bangid=xxx&page=N → { list: [songInfo...] }
+ * 旧版 lxserver 无此 API 时回退: 直连网易云官方 Toplist(无需鉴权,Electron 已注入 CORS *)
+ * 榜单歌曲均通过 lxserver /api/music/url 播放
  */
+
+/** lxserver 榜单 ID 前缀: 与网易云回退榜单区分 */
+const LX_BOARD_PREFIX = 'lxboard:'
+
+/** 网易云回退榜单(旧版 lxserver 无排行榜 API 时使用) */
 const NETEASE_BOARDS: Array<{ id: string; name: string }> = [
   { id: '19723756', name: '飙升榜' },
   { id: '3779629', name: '新歌榜' },
@@ -419,6 +419,19 @@ async function fetchNeteaseBoardSongs(boardId: string, limit = 100): Promise<Mus
 
 export async function getBoards(source = 'kw'): Promise<Array<{ id: string; name: string; cover: string; source: string }>> {
   if (hasCustomMusic()) {
+    // 优先走 lxserver 排行榜 API(新版支持,按当前选中源获取该平台真实榜单)
+    const data = await customMusicFetch(`/api/music/leaderboard/boards?source=${encodeURIComponent(source)}`)
+    const list: any[] = Array.isArray(data?.list) ? data.list : (Array.isArray(data) ? data : [])
+    if (list.length > 0) {
+      return list.map((b: any) => ({
+        // id 带前缀,区分 lxserver 榜单与网易云回退榜单
+        id: `${LX_BOARD_PREFIX}${source}:${String(b.bangid ?? b.id)}`,
+        name: String(b.name || b.bangid || b.id),
+        cover: '',
+        source,
+      }))
+    }
+    // 旧版 lxserver 无排行榜 API,回退网易云官方榜单
     return NETEASE_BOARDS.map((b) => ({
       id: b.id,
       name: b.name,
@@ -432,6 +445,18 @@ export async function getBoards(source = 'kw'): Promise<Array<{ id: string; name
 
 export async function getBoardSongs(source: string, boardId: string, page = 1): Promise<{ list: MusicSong[]; total: number; page: number }> {
   if (hasCustomMusic()) {
+    // lxserver 排行榜
+    if (boardId.startsWith(LX_BOARD_PREFIX)) {
+      const rest = boardId.slice(LX_BOARD_PREFIX.length)
+      const sep = rest.indexOf(':')
+      const src = rest.slice(0, sep)
+      const bangid = rest.slice(sep + 1)
+      const params = new URLSearchParams({ source: src, bangid, page: String(page) })
+      const data = await customMusicFetch(`/api/music/leaderboard/list?${params.toString()}`)
+      const list = normalizeCustomSearchData(data?.list)
+      return { list, total: Number(data?.total) || list.length, page }
+    }
+    // 网易云回退榜单
     const all = await fetchNeteaseBoardSongs(boardId, 100)
     const pageSize = 30
     const start = (page - 1) * pageSize
