@@ -28,9 +28,11 @@ export function useSpectrumCore() {
 
   /* ============ 频谱可视化:初始化 Web Audio API ============ */
   // 在首次播放时创建 AudioContext + AnalyserNode(浏览器限制需用户交互后才能创建)
-  // 注意: createMediaElementSource 会接管音频输出,若音频源跨域且无 CORS 头则会被静音
-  // 浏览器开发模式下音频 CDN 不支持 CORS,因此跳过可视化(音频正常通过 <audio> 播放)
-  // Electron 模式下 webSecurity:false 绕过了 CORS,可视化正常工作
+  // 注意: createMediaElementSource 会接管音频输出,若音频源跨域且无 CORS 头则会被静音(tainted)
+  // - 浏览器开发模式: 音频 CDN 无 CORS 头,跳过可视化(音频正常通过 <audio> 播放)
+  // - Electron: webSecurity 保持开启,主进程对 resourceType=media 的响应注入
+  //   Access-Control-Allow-Origin: *,因此这里必须把 <audio> 设为 crossOrigin='anonymous'
+  //   使媒体请求走 CORS 模式;属性必须在首次加载 src 之前设置(loadAndPlay 首次调用时、赋 src 前)
   const initVisualizer = useCallback((audio: HTMLAudioElement | null) => {
     if (audioCtxRef.current) return // 已初始化
     if (!audio) return
@@ -40,6 +42,8 @@ export function useSpectrumCore() {
       return
     }
     try {
+      // 必须先于任何 src 加载设置,否则已发出的无 CORS 请求仍会令音频流 tainted
+      audio.crossOrigin = 'anonymous'
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
       const ctx = new AudioCtx()
       const analyser = ctx.createAnalyser()

@@ -459,18 +459,22 @@ app.whenReady().then(() => {
     }
   )
 
-  // 为跨域 XHR/fetch 响应精确注入 CORS 头(替代全局关闭 webSecurity 的做法):
+  // 为跨域 XHR/fetch/媒体 响应精确注入 CORS 头(替代全局关闭 webSecurity 的做法):
   // 渲染层需要请求用户自配置的服务端、苹果 CMS 采集源、豆瓣等任意第三方主机,
   // 这些主机不会返回允许本应用的 CORS 头。仅对真正受同源策略约束的请求放行:
   //   - Electron 31 中 fetch 与 XHR 的 resourceType 均为 'xhr';CORS 预检为 OPTIONS
-  //   - 普通 <img>/<video>/<audio> 标签加载不受 CORS 限制(无 crossOrigin 属性),
-  //     不对其响应做任何修改
+  //   - media: 音乐页用 Web Audio API(createMediaElementSource)做频谱可视化,
+  //     跨域音频在 webSecurity 开启且无 ACAO 头时会被静音(tainted),需对
+  //     <audio crossOrigin="anonymous"> 的媒体响应注入 ACAO
+  //   - 普通 <img>/<video>/<audio> 标签(无 crossOrigin 属性)加载不受 CORS 限制,
+  //     注入头不改变其行为
   //   - 应用不使用 Cookie 凭证(HLS 显式 withCredentials=false),ACAO: * 合法有效
   ses.webRequest.onHeadersReceived(
     { urls: ['http://*/*', 'https://*/*'] },
     (details, callback) => {
       const corsRelevant =
         details.resourceType === 'xhr' ||
+        details.resourceType === 'media' ||
         details.method?.toUpperCase() === 'OPTIONS'
       if (!corsRelevant) {
         callback({ responseHeaders: details.responseHeaders })
