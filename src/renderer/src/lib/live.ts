@@ -1,6 +1,6 @@
 import { client } from './api'
 import { hasCustomLive, getCustomLiveSource, getCustomLiveEpg } from './customSource'
-import { parseM3U, extractTvgUrl, parseXmltvEpg, parseXmltvFull, type EpgProgramFull } from './m3u'
+import { parseM3U, extractTvgUrl, parseXmltvEpg, parseXmltvFull, normalizeEpgKey, type EpgProgramFull } from './m3u'
 
 export interface LiveSource {
   key: string
@@ -153,7 +153,7 @@ export async function getLiveChannels(source: string): Promise<LiveChannel[]> {
 export async function getLiveEpg(source: string, tvgId: string): Promise<LiveEpgProgram[]> {
   if (hasCustomLive()) {
     const map = await fetchCustomEpg()
-    return map[tvgId] || []
+    return map[tvgId] || map[normalizeEpgKey(tvgId)] || []
   }
   try {
     const res = await client.get('/api/live/epg', { params: { source, tvgId } })
@@ -190,7 +190,7 @@ function simpleToFull(programs: LiveEpgProgram[], channel: string): EpgProgramFu
 export async function getLiveEpgFull(source: string, tvgId: string): Promise<EpgProgramFull[]> {
   if (hasCustomLive()) {
     await fetchCustomEpg()
-    return cachedEpgFullMap?.[tvgId] || []
+    return cachedEpgFullMap?.[tvgId] || cachedEpgFullMap?.[normalizeEpgKey(tvgId)] || []
   }
   const simple = await getLiveEpg(source, tvgId)
   return simpleToFull(simple, tvgId)

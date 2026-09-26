@@ -116,7 +116,14 @@ export function parseXmltvTimeMs(s: string): number {
   return Date.UTC(year, month, day, hour, minute - offsetMin, second)
 }
 
-/** 解析完整 XMLTV 文本,返回 channel tvg-id → 节目数组(按开始时间升序) */
+/** EPG 查找键归一化:小写并去掉空格/横杠/下划线,兼容 "CCTV-1" vs "CCTV1" */
+export function normalizeEpgKey(s: string): string {
+  return s.toLowerCase().replace(/[\s\-_]+/g, '')
+}
+
+/** 解析完整 XMLTV 文本,返回 channel tvg-id → 节目数组(按开始时间升序)
+ *  索引键包含: programme 的原始 channel id、<channel> 的全部 display-name、
+ *  以及上述各键的归一化形式(normalizeEpgKey),保证 M3U 的 tvg-id 各种写法都能命中 */
 export function parseXmltvFull(xml: string): Record<string, EpgProgramFull[]> {
   const result: Record<string, EpgProgramFull[]> = {}
   // 兼容 channel 在 start/stop 前后任意顺序
@@ -151,6 +158,27 @@ export function parseXmltvFull(xml: string): Record<string, EpgProgramFull[]> {
   // 按开始时间排序
   for (const key of Object.keys(result)) {
     result[key].sort((a, b) => a.startMs - b.startMs)
+  }
+  // <channel id> → display-name 别名:display-name 与归一化键都指向同一节目数组(引用复用,无拷贝)
+  const chanRegex = /<channel\b[^>]*?\bid="([^"]+)"[^>]*>([\s\S]*?)<\/channel>/g
+  let cm: RegExpExecArray | null
+  const addAlias = (key: string, arr: EpgProgramFull[]) => {
+    if (key && !result[key]) result[key] = arr
+  }
+  while ((cm = chanRegex.exec(xml)) !== null) {
+    const id = cm[1]
+    const arr = result[id]
+    if (!arr) continue
+    for (const dn of cm[2].matchAll(/<display-name[^>]*>([\s\S]*?)<\/display-name>/g)) {
+      const name = decodeXmlEntities(stripCdata(dn[1]).trim())
+      addAlias(name, arr)
+      addAlias(normalizeEpgKey(name), arr)
+    }
+    addAlias(normalizeEpgKey(id), arr)
+  }
+  // 原始 programme 键的归一化形式兜底(无 <channel> 块的精简文件)
+  for (const key of Object.keys(result)) {
+    addAlias(normalizeEpgKey(key), result[key])
   }
   return result
 }
