@@ -367,7 +367,7 @@ export default function Settings() {
           {/* 音乐源 Token */}
           <FormField
             label="音乐源 Token"
-            hint="推荐 lxserver 持久 Token(x-user-token),避免触发频控;匿名访问仅用于只读场景"
+            hint="填 lxserver 持久 API Token 或网页登录密码(密码需配合下方用户名,首次请求自动登录换会话)"
           >
             <input
               type="password"
@@ -381,12 +381,12 @@ export default function Settings() {
           </FormField>
 
           {/* 音乐源用户名 */}
-          <FormField label="音乐源用户名(可选)">
+          <FormField label="音乐源用户名">
             <input
               type="text"
               value={customMusicUsername}
               onChange={(e) => setCustomMusicUsername(e.target.value)}
-              placeholder="配合 Token 使用(x-user-name),匿名可留空"
+              placeholder="音源脚本挂在具名用户下时必填(如 admin)"
               spellCheck={false}
               className="input-field w-full text-xs"
               style={{ background: 'var(--color-bg-secondary)' }}

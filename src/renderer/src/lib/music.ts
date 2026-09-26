@@ -46,22 +46,69 @@ export interface MusicLyric {
  * - 搜索: GET  /api/music/search?name={kw}&source={source}&page={page}&limit={limit}
  * - 播放: POST /api/music/url  body: { songInfo: 原始歌曲对象, quality } → { url, type, sourceName }
  * - 歌词: GET  /api/music/lyric?source=&songmid=&name=&singer=&albumId=&hash=&interval=...
- * - 认证: 头 x-user-name + x-user-token(匿名访问不带)
+ *         (POST 版本在部分 lxserver 返回未解包的 promise 包装,不可用)
+ * - 登录: POST /api/user/login body { username, password } → { success, token }(会话 7 天)
+ * - 认证: 头 x-user-name + x-user-token;音源脚本挂在具名用户下时必须带用户名,
+ *         否则服务端按 open 公开用户处理 → 搜不到可用音源
+ * - Token 字段兼容两种值: 持久 API Token 直接可用;填网页登录密码时 401 后自动登录换会话
  */
 
 /** 构造 lxserver 认证头 */
-function buildCustomMusicHeaders(extra?: Record<string, string>): Record<string, string> {
-  const { token, username } = getCustomMusicSource()
-  const headers: Record<string, string> = { ...extra }
-  if (token) {
+function buildCustomMusicHeaders(userToken: string): Record<string, string> {
+  const { username } = getCustomMusicSource()
+  const headers: Record<string, string> = {}
+  if (userToken) {
     if (username) headers['x-user-name'] = username
-    headers['x-user-token'] = token
+    headers['x-user-token'] = userToken
   }
   return headers
 }
 
-/** 自定义源 fetch(带认证与超时),失败返回 null */
-async function customMusicFetch(path: string, init?: RequestInit): Promise<any | null> {
+/** 密码登录换取的会话 token 缓存(lxserver 会话有效期 7 天,这里存 6 天) */
+let loginSession: { username: string; token: string; expiresAt: number } | null = null
+/** 上次登录失败时间:60 秒内不重复尝试,避免每次切歌都撞登录接口 */
+let loginFailedAt = 0
+
+/** 用用户名+密码登录 lxserver,成功返回会话 token */
+async function loginForSession(username: string, password: string): Promise<string | null> {
+  if (loginSession && loginSession.username === username && Date.now() < loginSession.expiresAt) {
+    return loginSession.token
+  }
+  if (Date.now() - loginFailedAt < 60_000) return null
+  const { url } = getCustomMusicSource()
+  const controller = new AbortController()
+  const tid = setTimeout(() => controller.abort(), 10000)
+  try {
+    const res = await fetch(`${url.replace(/\/$/, '')}/api/user/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+      signal: controller.signal,
+    })
+    const data = await res.json().catch(() => null)
+    if (res.ok && data?.success && typeof data.token === 'string') {
+      console.log('[CustomMusic] Password login OK, session cached for 6d')
+      loginSession = { username, token: data.token, expiresAt: Date.now() + 6 * 24 * 3600 * 1000 }
+      return loginSession.token
+    }
+    loginFailedAt = Date.now()
+    console.warn('[CustomMusic] Login failed:', data?.message || res.status)
+    return null
+  } catch (e) {
+    loginFailedAt = Date.now()
+    console.warn('[CustomMusic] Login error:', e)
+    return null
+  } finally {
+    clearTimeout(tid)
+  }
+}
+
+/** 自定义源单次 fetch;返回 { status, data },网络错误返回 null */
+async function customMusicFetchOnce(
+  path: string,
+  init: RequestInit | undefined,
+  userToken: string | null
+): Promise<{ status: number; data: any } | null> {
   const { url } = getCustomMusicSource()
   const fullUrl = `${url.replace(/\/$/, '')}${path}`
   const controller = new AbortController()
@@ -69,26 +116,46 @@ async function customMusicFetch(path: string, init?: RequestInit): Promise<any |
   try {
     const headers: Record<string, string> = {
       ...(init?.headers as Record<string, string> || {}),
+      ...buildCustomMusicHeaders(userToken || ''),
     }
-    Object.assign(headers, buildCustomMusicHeaders())
-    const res = await fetch(fullUrl, {
-      ...init,
-      headers,
-      signal: controller.signal,
-    })
+    const res = await fetch(fullUrl, { ...init, headers, signal: controller.signal })
     clearTimeout(tid)
     if (!res.ok) {
       let errBody = ''
       try { errBody = (await res.text()).substring(0, 120) } catch { /* ignore */ }
       console.warn(`[CustomMusic] HTTP ${res.status} for ${path} ${errBody}`)
-      return null
+      return { status: res.status, data: null }
     }
-    return await res.json()
+    return { status: res.status, data: await res.json() }
   } catch (e) {
     clearTimeout(tid)
     console.warn(`[CustomMusic] fetch error for ${path}:`, e)
     return null
   }
+}
+
+/** 自定义源 fetch:配置 Token 无效(401)时自动按登录密码换会话并重试一次 */
+async function customMusicFetch(path: string, init?: RequestInit): Promise<any | null> {
+  const { token, username } = getCustomMusicSource()
+  if (!token) {
+    const r = await customMusicFetchOnce(path, init, null)
+    return r?.data ?? null
+  }
+  // 已有有效登录会话则优先使用(说明配置 Token 是密码)
+  const cached = username && loginSession?.username === username && Date.now() < loginSession.expiresAt
+    ? loginSession.token
+    : token
+  let r = await customMusicFetchOnce(path, init, cached)
+  if (r && r.status !== 401) return r.data
+  // 401 → Token 不是有效 API Token,尝试作为登录密码换取会话后重试
+  if (username) {
+    const session = await loginForSession(username, token)
+    if (session) {
+      r = await customMusicFetchOnce(path, init, session)
+      if (r && r.status !== 401) return r.data
+    }
+  }
+  return r?.data ?? null
 }
 
 /** 归一化 lxserver 搜索条目为 MusicSong(保留原始对象供播放 API 回传) */
@@ -209,17 +276,29 @@ export async function getMusicUrlFromServer(song: MusicSong, quality = '320k'): 
 /**
  * 获取歌词
  * - moontvplus 服务器模式: 走 /api/music/v2/lyric
- * - 自定义源模式: POST lxserver /api/music/lyric(官方 API 文档要求 POST,原 GET 会导致 404)
+ * - 自定义源模式: lxserver GET /api/music/lyric(实测可用;POST 版本返回未解包
+ *   promise 包装 {"isCancelled":false,"promise":{}},不可用),songmid 自动去源前缀
  */
 export async function getMusicLyric(song: MusicSong): Promise<MusicLyric> {
   if (hasCustomMusic()) {
-    // LX Server 文档: POST /api/music/lyric,Body 与搜索返回的歌曲字段一致
-    const songInfo = song.raw ?? song
-    const data = await customMusicFetch('/api/music/lyric', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(songInfo),
+    const songInfo = (song.raw ?? song) as any
+    const source = String(songInfo.source || song.source || '')
+    let songmid = String(songInfo.songmid || song.songId || song.songmid || '')
+    if (source && songmid.startsWith(`${source}_`)) songmid = songmid.slice(source.length + 1)
+    const params = new URLSearchParams({
+      source,
+      songmid,
+      name: String(songInfo.name || song.name || ''),
+      singer: String(songInfo.singer || song.artist || ''),
+      hash: String(songInfo.hash || song.hash || ''),
+      interval: String(songInfo.interval || song.durationText || ''),
+      copyrightId: String(songInfo.copyrightId || song.copyrightId || ''),
+      albumId: String(songInfo.albumId || song.albumId || ''),
+      lrcUrl: String(songInfo.lrcUrl || song.lrcUrl || ''),
+      mrcUrl: String(songInfo.mrcUrl || song.mrcUrl || ''),
+      trcUrl: String(songInfo.trcUrl || song.trcUrl || ''),
     })
+    const data = await customMusicFetch(`/api/music/lyric?${params.toString()}`)
     const lyric = data?.lyric || data?.lrc || ''
     if (lyric) {
       return {
