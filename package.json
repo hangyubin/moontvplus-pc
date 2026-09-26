@@ -1,6 +1,6 @@
 {
   "name": "moontvplus-pc",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "MoonTVPlus PC 客户端 - 支持观看历史多端同步",
   "main": "./out/main/index.js",
   "author": "moontvplus-pc",

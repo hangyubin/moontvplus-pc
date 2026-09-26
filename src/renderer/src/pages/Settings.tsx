@@ -5,6 +5,7 @@
  */
 import { useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { version as APP_VERSION } from '../../../../package.json'
 import {
   getCustomVideoSource,
   setCustomVideoSource,
@@ -504,7 +505,7 @@ export default function Settings() {
                   className="badge text-xs font-medium"
                   style={{ color: 'var(--color-primary)' }}
                 >
-                  v1.1.0
+                  v{APP_VERSION}
                 </span>
               </div>
               <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
