@@ -126,8 +126,8 @@ export default function Settings() {
   const serverConnected = !!auth?.username
 
   useEffect(() => {
-    setHideTrailers(localStorage.getItem('search_hideTrailers') !== '0')
-    setBlockNSFW(localStorage.getItem('search_blockNSFW') !== '0')
+    try { setHideTrailers(localStorage.getItem('search_hideTrailers') !== '0') } catch { /* ignore */ }
+    try { setBlockNSFW(localStorage.getItem('search_blockNSFW') !== '0') } catch { /* ignore */ }
     setCustomVideo(getCustomVideoSource())
     setCustomLive(getCustomLiveSource())
     setCustomLiveEpgInput(getCustomLiveEpg())
@@ -220,14 +220,14 @@ export default function Settings() {
   const toggleTrailers = () => {
     const v = !hideTrailers
     setHideTrailers(v)
-    localStorage.setItem('search_hideTrailers', v ? '1' : '0')
+    try { localStorage.setItem('search_hideTrailers', v ? '1' : '0') } catch { /* ignore */ }
     toast.success(v ? '已开启预告片过滤' : '已关闭预告片过滤')
   }
 
   const toggleNSFW = () => {
     const v = !blockNSFW
     setBlockNSFW(v)
-    localStorage.setItem('search_blockNSFW', v ? '1' : '0')
+    try { localStorage.setItem('search_blockNSFW', v ? '1' : '0') } catch { /* ignore */ }
     toast.success(v ? '已开启18禁内容过滤' : '已关闭18禁内容过滤')
   }
 

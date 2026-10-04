@@ -42,6 +42,8 @@ export function useMusicPlayer({ audioCtxRef, initVisualizer, upsertPlaylistSong
   /* ============ 进度条拖动 ============ */
   const progressBarRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
+  /** 拖拽中的 pointerId,用于 setPointerCapture/releasePointerCapture */
+  const dragPointerIdRef = useRef<number | null>(null)
 
   // 用 ref 保存 playlist / currentIndex / volume / muted,
   // 避免 onEnded 等闭包捕获过期状态
@@ -423,6 +425,13 @@ export function useMusicPlayer({ audioCtxRef, initVisualizer, upsertPlaylistSong
 
   const onProgressMouseDown = (e: React.MouseEvent) => {
     if (!duration) return
+    // 用 Pointer Capture 确保拖出窗口仍能跟踪,替代纯 window mousemove
+    const bar = progressBarRef.current
+    const native = e.nativeEvent as MouseEvent & { pointerId?: number }
+    if (bar && native.pointerId != null) {
+      dragPointerIdRef.current = native.pointerId
+      bar.setPointerCapture(native.pointerId)
+    }
     setIsDragging(true)
     seekToClientX(e.clientX)
   }
@@ -469,16 +478,33 @@ export function useMusicPlayer({ audioCtxRef, initVisualizer, upsertPlaylistSong
     return true
   }
 
-  // 全局拖动监听(拖动期间持续 seek)
+  // 全局拖动监听(拖动期间持续 seek; pointermove 配合 setPointerCapture 可在拖出窗口后仍跟踪)
   useEffect(() => {
     if (!isDragging) return
-    const onMove = (e: MouseEvent) => seekToClientX(e.clientX)
-    const onUp = () => setIsDragging(false)
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    const bar = progressBarRef.current
+    const onMove = (e: PointerEvent) => seekToClientX(e.clientX)
+    const onUp = () => {
+      setIsDragging(false)
+      // 释放 pointer capture,避免后续事件仍被捕获
+      if (bar && dragPointerIdRef.current != null) {
+        try { bar.releasePointerCapture(dragPointerIdRef.current) } catch { /* 未捕获过指针时忽略 */ }
+        dragPointerIdRef.current = null
+      }
+    }
+    const onCancel = () => {
+      setIsDragging(false)
+      if (bar && dragPointerIdRef.current != null) {
+        try { bar.releasePointerCapture(dragPointerIdRef.current) } catch { /* 忽略 */ }
+        dragPointerIdRef.current = null
+      }
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
     return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onCancel)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDragging, duration])

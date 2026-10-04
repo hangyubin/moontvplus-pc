@@ -564,6 +564,37 @@ input[type="range"]:active::-webkit-slider-thumb {
 }
 .animate-toast-in { animation: toastIn 0.22s cubic-bezier(0.21, 1.02, 0.73, 1); }
 
+/* ============ 侧边栏导航动画 ============ */
+/* 入场:从左淡入(配合逐项 animation-delay 形成错落) */
+@keyframes navItemEnter {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.nav-item-enter { animation: navItemEnter 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* 选中瞬间图标弹跳 */
+@keyframes navIconPop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.28) rotate(-6deg); }
+  70% { transform: scale(0.94); }
+  100% { transform: scale(1.08); }
+}
+.nav-icon-pop { animation: navIconPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* 导航项选中态:NavLink 自动带 aria-current="page",类名恒定可避免动画重播 */
+.nav-link {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+.nav-link[aria-current='page'] {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.nav-link:not([aria-current='page']):hover {
+  background: var(--color-hover-overlay);
+  color: var(--color-text-primary);
+}
+
 @keyframes eq {
   from { transform: scaleY(0.3); }
   to { transform: scaleY(1); }

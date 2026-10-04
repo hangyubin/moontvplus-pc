@@ -367,6 +367,8 @@ export default function Live() {
       setPanelVisible(false)
       return
     }
+    // 注意:useLivePlayer 的 effect 会在 currentChannel 变化时自动 setPlayerLoading(true),
+    // 这里不需要重复设置,避免覆盖播放器内部状态
     setCurrentChannel(ch)
     setCurrentUrlIndex(0)
     blockedUrlsRef.current.clear()

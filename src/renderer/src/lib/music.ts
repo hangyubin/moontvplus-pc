@@ -159,29 +159,36 @@ async function customMusicFetch(path: string, init?: RequestInit): Promise<any |
 }
 
 /** 归一化 lxserver 搜索条目为 MusicSong(保留原始对象供播放 API 回传) */
-function normalizeCustomSearchData(data: any): MusicSong[] {
-  const list: any[] = Array.isArray(data) ? data : (Array.isArray(data?.list) ? data.list : [])
+function normalizeCustomSearchData(data: unknown): MusicSong[] {
+  const list: unknown[] = Array.isArray(data)
+    ? data
+    : (Array.isArray((data as Record<string, unknown>)?.list)
+        ? (data as Record<string, unknown>).list as unknown[]
+        : [])
   return list
-    .map((s: any) => ({
-      songId: String(s.songmid || s.songId || s.id || s.hash || s.copyrightId || ''),
-      source: String(s.source || ''),
-      name: String(s.name || s.songname || s.title || ''),
-      artist: String(s.singer || s.artist || s.singername || ''),
-      album: s.albumName || s.album || undefined,
-      cover: s.img || s.cover || s.pic || undefined,
-      pic: s.pic || undefined,
-      durationText: s.interval || s.durationText || undefined,
-      durationSec: typeof s.duration === 'number' ? s.duration : undefined,
-      duration: typeof s.duration === 'number' ? s.duration : undefined,
-      songmid: s.songmid ? String(s.songmid) : undefined,
-      hash: s.hash || undefined,
-      copyrightId: s.copyrightId || undefined,
-      albumId: s.albumId ? String(s.albumId) : undefined,
-      lrcUrl: s.lrcUrl || undefined,
-      mrcUrl: s.mrcUrl || undefined,
-      trcUrl: s.trcUrl || undefined,
-      raw: s,
-    }))
+    .map((s: unknown) => {
+      const item = s as Record<string, unknown>
+      return {
+        songId: String(item.songmid || item.songId || item.id || item.hash || item.copyrightId || ''),
+        source: String(item.source || ''),
+        name: String(item.name || item.songname || item.title || ''),
+        artist: String(item.singer || item.artist || item.singername || ''),
+        album: (item.albumName || item.album || undefined) as string | undefined,
+        cover: (item.img || item.cover || item.pic || undefined) as string | undefined,
+        pic: (item.pic || undefined) as string | undefined,
+        durationText: (item.interval || item.durationText || undefined) as string | undefined,
+        durationSec: typeof item.duration === 'number' ? item.duration : undefined,
+        duration: typeof item.duration === 'number' ? item.duration : undefined,
+        songmid: item.songmid ? String(item.songmid) : undefined,
+        hash: (item.hash || undefined) as string | undefined,
+        copyrightId: (item.copyrightId || undefined) as string | undefined,
+        albumId: item.albumId ? String(item.albumId) : undefined,
+        lrcUrl: (item.lrcUrl || undefined) as string | undefined,
+        mrcUrl: (item.mrcUrl || undefined) as string | undefined,
+        trcUrl: (item.trcUrl || undefined) as string | undefined,
+        raw: item,
+      }
+    })
     .filter((s: MusicSong) => s.songId && s.name)
 }
 
@@ -500,15 +507,18 @@ export async function getBoards(source = 'kw'): Promise<Array<{ id: string; name
   if (hasCustomMusic()) {
     // 优先走 lxserver 排行榜 API(新版支持,按当前选中源获取该平台真实榜单)
     const data = await customMusicFetch(`/api/music/leaderboard/boards?source=${encodeURIComponent(source)}`)
-    const list: any[] = Array.isArray(data?.list) ? data.list : (Array.isArray(data) ? data : [])
+    const list = Array.isArray(data?.list) ? data.list : (Array.isArray(data) ? data : [])
     if (list.length > 0) {
-      return list.map((b: any) => ({
-        // id 带前缀,区分 lxserver 榜单与网易云回退榜单
-        id: `${LX_BOARD_PREFIX}${source}:${String(b.bangid ?? b.id)}`,
-        name: String(b.name || b.bangid || b.id),
-        cover: '',
-        source,
-      }))
+      return list.map((b: unknown) => {
+        const item = b as Record<string, unknown>
+        return {
+          // id 带前缀,区分 lxserver 榜单与网易云回退榜单
+          id: `${LX_BOARD_PREFIX}${source}:${String(item.bangid ?? item.id)}`,
+          name: String(item.name || item.bangid || item.id),
+          cover: '',
+          source,
+        }
+      })
     }
     // 旧版 lxserver 无排行榜 API,回退网易云官方榜单
     return NETEASE_BOARDS.map((b) => ({

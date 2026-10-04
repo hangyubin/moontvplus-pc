@@ -35,6 +35,10 @@ export default defineConfig({
         }
       }
     },
+    // 生产构建时移除 console 语句(仅影响打包产物,开发时保留)
+    esbuild: {
+      drop: process.env.NODE_ENV === 'production' ? ['console'] : []
+    },
     resolve: {
       alias: { '@renderer': resolve('src/renderer/src') }
     },

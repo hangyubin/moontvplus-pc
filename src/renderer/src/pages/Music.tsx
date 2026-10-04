@@ -137,6 +137,9 @@ export default function Music() {
     // 播放列表最近播放的歌曲排在最前,从它开始自动续播
     if (history.playlistSongs.length > 0 && player.playlist.length === 0) {
       player.startPlaylist(history.playlistSongs, 0)
+      // 同步切换到播放列表视图,当前歌曲高亮并自动滚动到可见位置
+      history.setView('playlist')
+      boards.setCurrentBoardId('')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [history.loaded, history.playlistSongs])

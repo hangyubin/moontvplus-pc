@@ -45,6 +45,33 @@ async function openImageCache(): Promise<Cache | null> {
   }
 }
 
+/** LRU 缓存上限:最多缓存 500 张图片,超出后淘汰最久未访问的 */
+const MAX_CACHE_ENTRIES = 500
+
+/** 清理过期/超量缓存(LRU 淘汰) */
+async function evictCacheIfNeeded(cache: Cache): Promise<void> {
+  try {
+    const keys = await cache.keys()
+    if (keys.length <= MAX_CACHE_ENTRIES) return
+
+    // 读取所有缓存项的元数据(时间戳),按最久未使用排序删除
+    const items: { key: Request; time: number }[] = []
+    for (const key of keys) {
+      const resp = await cache.match(key)
+      const time = Number(resp?.headers.get('x-cache-time') || 0)
+      items.push({ key, time })
+    }
+    // 按时间升序(最旧的在前),删除超出上限的部分
+    items.sort((a, b) => a.time - b.time)
+    const toDelete = items.slice(0, items.length - MAX_CACHE_ENTRIES)
+    for (const item of toDelete) {
+      await cache.delete(item.key)
+    }
+  } catch {
+    // 淘汰失败不影响主流程
+  }
+}
+
 /**
  * 解析最终用于显示的图片地址(缓存优先)。
  * - 命中 24h 内缓存:返回 blob: URL(离线也能显示)
@@ -87,6 +114,8 @@ export async function resolveImageUrl(rawUrl: string): Promise<string> {
         })
         // put 失败(配额等)不影响本次显示
         cache.put(rawUrl, stored).catch(() => {})
+        // LRU:写入后异步检查是否需要淘汰最久未访问的缓存
+        evictCacheIfNeeded(cache).catch(() => {})
       }
     }
   } catch {

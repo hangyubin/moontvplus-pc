@@ -1,7 +1,7 @@
 /**
  * 音乐页右侧:两段式面板
- *  - 上段:歌曲封面大图 + [收藏](播放的歌曲自动在播放列表中,无需重复加入;
- *    歌名/歌手在底部播放栏已有,此处不重复)
+ *  - 上段:歌曲封面大图(放大)+ 图上红心收藏按钮(无底色、默认不遮挡封面;
+ *    播放的歌曲自动在播放列表中,无需重复加入;歌名/歌手在底部播放栏已有,此处不重复)
  *  - 下段:歌词(模糊封面背景 + 卡拉OK高亮 + 设置)
  *
  * 配色全部走主题变量:
@@ -68,8 +68,8 @@ export default function MusicLyricPanel({
       <div className="flex-shrink-0 px-5 pt-4 pb-3 border-b border-[var(--color-border-subtle)]">
         {/* 大封面(方形,尺寸随窗口高度自适应:窗口矮时自动缩小,把高度让给歌词区) */}
         <div
-          className="aspect-square mx-auto rounded-xl overflow-hidden relative bg-[var(--color-hover-overlay-subtle)] ring-1 ring-white/5 shadow-lg shadow-black/20"
-          style={{ width: 'min(100%, clamp(120px, 20vh, 220px))' }}
+          className="group aspect-square mx-auto rounded-xl overflow-hidden relative bg-[var(--color-hover-overlay-subtle)] ring-1 ring-white/5 shadow-lg shadow-black/20"
+          style={{ width: 'min(100%, clamp(140px, 24vh, 248px))' }}
         >
           {coverUrl ? (
             <img
@@ -83,31 +83,39 @@ export default function MusicLyricPanel({
               <Icon name="music" size={56} strokeWidth={1.4} />
             </div>
           )}
-        </div>
 
-        {/* 操作按钮:收藏(播放即自动进入播放列表,歌名/歌手在底部播放栏) */}
-        <div className="mt-3 flex gap-2">
-          <button
-            onClick={onToggleFavorite}
-            disabled={!currentSong}
-            className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs rounded border transition-all disabled:opacity-40"
-            style={
-              isFavorite
-                ? {
-                    color: 'var(--color-primary)',
-                    borderColor: withAlpha('var(--color-primary)', 50),
-                    backgroundColor: withAlpha('var(--color-primary)', 10)
-                  }
-                : {
-                    color: 'var(--color-text-secondary)',
-                    borderColor: 'var(--color-border-subtle)'
-                  }
-            }
-            title={isFavorite ? '取消收藏' : '收藏'}
-          >
-            <Icon name={isFavorite ? 'heart' : 'heart-outline'} size={13} />
-            {isFavorite ? '已收藏' : '收藏'}
-          </button>
+          {/* 收藏红心:无底色圆块、不遮挡封面。
+              未收藏:默认隐藏,hover 封面时淡入白色空心心(带阴影,浅底图也可见);悬停到心上时白心消失、红色实心心出现,提示可收藏;
+              已收藏:红色实心心(#ff2d55)常显,hover 轻微放大 */}
+          {currentSong && (
+            <button
+              onClick={onToggleFavorite}
+              title={isFavorite ? '取消收藏' : '收藏'}
+              aria-label={isFavorite ? '取消收藏' : '收藏'}
+              className="group/heart absolute top-2 right-2 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90"
+            >
+              {isFavorite ? (
+                <Icon
+                  name="heart"
+                  size={22}
+                  className="text-[#ff2d55] drop-shadow-[0_1px_4px_rgba(0,0,0,0.45)] transition-transform duration-200 group-hover/heart:scale-110"
+                />
+              ) : (
+                <>
+                  <Icon
+                    name="heart-outline"
+                    size={20}
+                    className="absolute text-white opacity-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)] transition-opacity duration-200 group-hover:opacity-100 group-hover/heart:opacity-0"
+                  />
+                  <Icon
+                    name="heart"
+                    size={20}
+                    className="text-[#ff2d55] opacity-0 drop-shadow-[0_1px_3px_rgba(0,0,0,0.45)] transition-opacity duration-200 group-hover/heart:opacity-100"
+                  />
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 

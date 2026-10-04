@@ -5,6 +5,7 @@
  * globals.css 中的 CSS 变量和覆盖规则根据属性值切换颜色。
  */
 import { useEffect, useState, useCallback } from 'react'
+import { toast } from '../components/Toast'
 
 type Theme = 'dark' | 'light'
 
@@ -47,6 +48,7 @@ export function useTheme() {
         /* ignore */
       }
       applyTheme(next)
+      toast.success(next === 'dark' ? '已切换到深色模式' : '已切换到浅色模式')
       return next
     })
   }, [])
@@ -59,6 +61,7 @@ export function useTheme() {
       /* ignore */
     }
     applyTheme(t)
+    toast.success(t === 'dark' ? '已切换到深色模式' : '已切换到浅色模式')
     setThemeState(t)
   }, [])
 

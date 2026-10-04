@@ -217,6 +217,8 @@ export default function Search() {
  const cancelRef = useRef<(() => void) | null>(null)
  /** groups 的最新值镜像:complete 时据此持久化搜索结果 */
  const groupsRef = useRef<SourceGroup[]>([])
+ /** 搜索输入防抖 timer(300ms) */
+ const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
  const [recommendList, setRecommendList] = useState<DoubanCategoryItem[]>([])
 
  // 开关变化时持久化
@@ -227,7 +229,14 @@ export default function Search() {
  localStorage.setItem('search_blockNSFW', blockNSFW ? '1' : '0')
  }, [blockNSFW])
 
- // 加载搜索源列表(用于识别18禁源,从源头过滤)
+// 组件卸载时清理防抖 timer
+ useEffect(() => {
+ return () => {
+ if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+ }
+ }, [])
+
+// 加载搜索源列表(用于识别18禁源,从源头过滤)
  useEffect(() => {
  getSearchResources()
  .then((resources) => {
@@ -535,14 +544,23 @@ const handleRecommendClick = useCallback((item: DoubanCategoryItem) => {
  <form onSubmit={handleSearch} className="relative max-w-3xl mx-auto">
  <Icon name="search" size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-text-tertiary)] pointer-events-none" />
  <input
- type="text"
- value={inputValue}
- onChange={(e) => setInputValue(e.target.value)}
- placeholder="搜索影视、剧集..."
- className="input-field w-full"
- style={{ paddingLeft: '2.75rem', height: '40px' }}
- autoFocus
- />
+	 type="text"
+	 value={inputValue}
+	 onChange={(e) => {
+	 const v = e.target.value
+	 setInputValue(v)
+	 // 300ms 防抖自动搜索
+	 if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+	 searchTimerRef.current = setTimeout(() => {
+	 const kw = v.trim()
+	 if (kw) setSearchParams({ q: kw }, { replace: true })
+	 }, 300)
+	 }}
+	 placeholder="搜索影视、剧集..."
+	 className="input-field w-full"
+	 style={{ paddingLeft: '2.75rem', height: '40px' }}
+	 autoFocus
+	 />
  {inputValue && (
  <button
  type="button"

@@ -56,6 +56,11 @@ export default function Play() {
  const artRef = useRef<Artplayer | null>(null)
  const hlsRef = useRef<Hls | null>(null)
 
+ // 播放记录去重:同一会话内相同 source+id+index 的进度上报做 3 秒防抖,
+ // 防止 timeupdate/pause/ended/beforeunload 同时触发产生多条记录
+ const lastRecordKeyRef = useRef('')
+ const lastRecordTimeRef = useRef(0)
+
  const [detail, setDetail] = useState<SearchResult | null>(null)
  const [loading, setLoading] = useState(true)
  const [error, setError] = useState('')
@@ -248,12 +253,20 @@ export default function Play() {
  }, [navigate, destroyPlayerSync])
 
  // beforeunload:窗口关闭时保存进度(使用 ref 中的最新值)
+ // 与 saveProgress 共用防抖:窗口关闭时若刚保存过则跳过
  useEffect(() => {
  const handler = () => {
  const art = artRef.current
  const { index: idx, detail: d, source: s, id: i, title: t } = stateRef.current
  if (!art || !d) return
  if (art.currentTime < 1 || !art.duration) return
+ const key = `${s}::${i}::${idx}`
+ const now = Date.now()
+ if (key === lastRecordKeyRef.current && now - lastRecordTimeRef.current < 3000) {
+ return
+ }
+ lastRecordKeyRef.current = key
+ lastRecordTimeRef.current = now
  const rec: PlayRecord = {
  title: d.title,
  source_name: d.source_name,
@@ -263,7 +276,7 @@ export default function Play() {
  total_episodes: d.episodes?.length || 0,
  play_time: art.currentTime,
  total_time: art.duration,
- save_time: Date.now(),
+ save_time: now,
  search_title: t
  }
  upsertPlayRecord(s, i, rec)
@@ -378,6 +391,15 @@ export default function Play() {
  // cleanup 时 artRef.current 可能已被置 null
  if (!art || art.isDestroy) return
  if (art.currentTime < 1 || !art.duration) return
+ // 同一会话内相同 source+id+index 做 3 秒防抖,
+ // 防止 timeupdate/pause/ended/beforeunload 同时触发产生多条记录
+ const key = `${source}::${id}::${capturedIndex}`
+ const now = Date.now()
+ if (key === lastRecordKeyRef.current && now - lastRecordTimeRef.current < 3000) {
+ return
+ }
+ lastRecordKeyRef.current = key
+ lastRecordTimeRef.current = now
  const rec: PlayRecord = {
  title: detail.title,
  source_name: detail.source_name,
@@ -387,7 +409,7 @@ export default function Play() {
  total_episodes: episodes.length,
  play_time: art.currentTime,
  total_time: art.duration,
- save_time: Date.now(),
+ save_time: now,
  search_title: title
  }
  upsertPlayRecord(source, id, rec)
