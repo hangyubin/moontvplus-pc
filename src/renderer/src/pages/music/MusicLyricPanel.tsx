@@ -64,25 +64,35 @@ export default function MusicLyricPanel({
 
   return (
     <div className="w-72 flex-shrink-0 border-l border-[var(--color-border-subtle)] flex flex-col bg-[var(--color-panel-bg)]">
-      {/* ============ 上段:封面大图 + 操作 ============ */}
-      <div className="flex-shrink-0 px-5 pt-4 pb-3 border-b border-[var(--color-border-subtle)]">
-        {/* 大封面(方形,尺寸随窗口高度自适应:窗口矮时自动缩小,把高度让给歌词区) */}
+      {/* ============ 上段:封面大图(铺满面板全宽) + 操作 ============ */}
+      <div className="flex-shrink-0 border-b border-[var(--color-border-subtle)]">
+        {/* 封面容器:全宽铺满、方形,不再两侧留白;边缘内阴影增加层次 */}
         <div
-          className="group aspect-square mx-auto rounded-xl overflow-hidden relative bg-[var(--color-hover-overlay-subtle)] ring-1 ring-white/5 shadow-lg shadow-black/20"
-          style={{ width: 'min(100%, clamp(140px, 24vh, 248px))' }}
+          className="group relative w-full overflow-hidden bg-[var(--color-hover-overlay-subtle)]"
+          style={{ aspectRatio: '1 / 1' }}
         >
           {coverUrl ? (
             <img
               key={currentSong!.songmid || currentSong!.name}
               src={coverUrl}
               alt={currentSong?.name}
-              className="w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-cover"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-[var(--color-text-quaternary)]">
-              <Icon name="music" size={56} strokeWidth={1.4} />
+            <div className="absolute inset-0 flex items-center justify-center text-[var(--color-text-quaternary)]">
+              <Icon name="music" size={64} strokeWidth={1.4} />
             </div>
           )}
+
+          {/* 顶部/底部渐变阴影:让封面与面板边缘过渡自然,层次更丰富 */}
+          <div
+            aria-hidden
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                'linear-gradient(to bottom, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,0) 72%, rgba(0,0,0,0.32) 100%)',
+            }}
+          />
 
           {/* 收藏红心:无底色圆块、不遮挡封面。
               未收藏:默认隐藏,hover 封面时淡入白色空心心(带阴影,浅底图也可见);悬停到心上时白心消失、红色实心心出现,提示可收藏;
@@ -92,7 +102,7 @@ export default function MusicLyricPanel({
               onClick={onToggleFavorite}
               title={isFavorite ? '取消收藏' : '收藏'}
               aria-label={isFavorite ? '取消收藏' : '收藏'}
-              className="group/heart absolute top-2 right-2 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90"
+              className="group/heart absolute top-2.5 right-2.5 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90"
             >
               {isFavorite ? (
                 <Icon

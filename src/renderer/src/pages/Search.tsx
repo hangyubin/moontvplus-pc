@@ -204,12 +204,10 @@ export default function Search() {
  const [errorSources, setErrorSources] = useState<{ source: string; sourceName: string; error: string }[]>([])
  const [history, setHistory] = useState<string[]>([])
  const [hideTrailers, setHideTrailers] = useState(() => {
- const saved = localStorage.getItem('search_hideTrailers')
- return saved === null ? true : saved === '1'
+ try { return localStorage.getItem('search_hideTrailers') !== '0' } catch { return true }
  }) // 默认过滤预告片,持久化
  const [blockNSFW, setBlockNSFW] = useState(() => {
- const saved = localStorage.getItem('search_blockNSFW')
- return saved === null ? true : saved === '1'
+ try { return localStorage.getItem('search_blockNSFW') !== '0' } catch { return true }
  }) // 默认开启18禁过滤,持久化
  const [nsfwSourceKeys, setNsfwSourceKeys] = useState<Set<string>>(new Set())
  /** NSFW 源集合是否加载完成(完成前不发起搜索,避免集合为空时多搜一次) */
@@ -217,8 +215,8 @@ export default function Search() {
  const cancelRef = useRef<(() => void) | null>(null)
  /** groups 的最新值镜像:complete 时据此持久化搜索结果 */
  const groupsRef = useRef<SourceGroup[]>([])
- /** 搜索输入防抖 timer(300ms) */
- const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+ /** 输入法合成中标记:中文候选未上屏时按回车不应提交搜索 */
+ const composingRef = useRef(false)
  const [recommendList, setRecommendList] = useState<DoubanCategoryItem[]>([])
 
  // 开关变化时持久化
@@ -228,13 +226,6 @@ export default function Search() {
  useEffect(() => {
  localStorage.setItem('search_blockNSFW', blockNSFW ? '1' : '0')
  }, [blockNSFW])
-
-// 组件卸载时清理防抖 timer
- useEffect(() => {
- return () => {
- if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
- }
- }, [])
 
 // 加载搜索源列表(用于识别18禁源,从源头过滤)
  useEffect(() => {
@@ -411,7 +402,7 @@ export default function Search() {
  setLoading(false)
  }, [])
 
- /** 搜索提交 */
+ /** 搜索提交(回车或点击搜索按钮):唯一的搜索触发入口 */
  const handleSearch = useCallback((e: React.FormEvent) => {
  e.preventDefault()
  const kw = inputValue.trim()
@@ -547,16 +538,16 @@ const handleRecommendClick = useCallback((item: DoubanCategoryItem) => {
 	 type="text"
 	 value={inputValue}
 	 onChange={(e) => {
-	 const v = e.target.value
-	 setInputValue(v)
-	 // 300ms 防抖自动搜索
-	 if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-	 searchTimerRef.current = setTimeout(() => {
-	 const kw = v.trim()
-	 if (kw) setSearchParams({ q: kw }, { replace: true })
-	 }, 300)
+	 // 仅更新输入框内容,不触发任何搜索;搜索只由回车/提交按钮发起
+	 setInputValue(e.target.value)
 	 }}
-	 placeholder="搜索影视、剧集..."
+	 onKeyDown={(e) => {
+	 // 输入法候选选词时的回车(选择候选词)不应触发搜索
+	 if (e.key === 'Enter' && composingRef.current) e.preventDefault()
+	 }}
+	 onCompositionStart={() => { composingRef.current = true }}
+	 onCompositionEnd={() => { composingRef.current = false }}
+	 placeholder="输入关键词,按回车键搜索..."
 	 className="input-field w-full"
 	 style={{ paddingLeft: '2.75rem', height: '40px' }}
 	 autoFocus
@@ -564,13 +555,23 @@ const handleRecommendClick = useCallback((item: DoubanCategoryItem) => {
  {inputValue && (
  <button
  type="button"
- onClick={() => { setInputValue(''); setSearchParams({}, { replace: true }) }}
+ onClick={() => {
+ // 清空输入与搜索结果,回到推荐页
+ setInputValue('')
+ setSearchParams({}, { replace: true })
+ }}
  className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition-colors"
  >
  <Icon name="x" size={16} />
  </button>
  )}
  </form>
+ {/* 常驻操作提示:明确告知搜索方式 */}
+ {inputValue && (
+ <p className="max-w-3xl mx-auto mt-2 text-xs text-[var(--color-text-tertiary)] text-center">
+	 按回车键开始搜索
+	 </p>
+ )}
  </div>
 
  {/* ============ 无关键词:热门搜索 + 搜索历史 + 推荐(上下布局) ============ */}
