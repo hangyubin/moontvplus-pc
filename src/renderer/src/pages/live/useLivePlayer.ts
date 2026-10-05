@@ -40,6 +40,22 @@ export function useLivePlayer({
   const currentUrlRef = useRef<string>('')
   const autoSwitchRef = useRef<(url: string) => void>(() => {})
 
+  /** 诊断统计(诊断面板每秒读取):
+   * - waiting/stalled:缓冲耗尽事件次数,区分"网络型卡顿"
+   * - fragsLoaded/lastFragMs/maxFragMs:分片下载耗时,判断网速是否追得上直播
+   * - netFatal/mediaFatal:致命错误计数 */
+  const diagStatsRef = useRef({
+    waiting: 0,
+    stalled: 0,
+    playing: 0,
+    netFatal: 0,
+    mediaFatal: 0,
+    fragsLoaded: 0,
+    lastFragMs: 0,
+    maxFragMs: 0,
+    sumFragMs: 0,
+  })
+
   const [autoSwitchMsg, setAutoSwitchMsg] = useState('')
 
   /* ============ 销毁播放器(同步) ============ */
@@ -117,28 +133,60 @@ export function useLivePlayer({
           if (video.canPlayType('application/vnd.apple.mpegurl')) {
             video.src = src
           } else if (Hls.isSupported()) {
+            // 每次换流重置诊断计数
+            const diag = diagStatsRef.current
+            diag.waiting = 0; diag.stalled = 0; diag.playing = 0
+            diag.netFatal = 0; diag.mediaFatal = 0
+            diag.fragsLoaded = 0; diag.lastFragMs = 0; diag.maxFragMs = 0; diag.sumFragMs = 0
+
+            // 直播缓冲配置(方案A):
+            // 旧配置 maxBufferLength=10s + liveSyncCount=3,前向缓冲常不足 10s,网络微抖即卡;
+            // 现统一用 Duration 族(秒)拉大直播延迟与缓冲——禁止与 Count 族混用,否则抛 Illegal config
             const hls = new Hls({
               liveDurationInfinity: true,
-              lowLatencyMode: true,
-              liveSyncDurationCount: 3,
-              liveMaxLatencyDurationCount: 6,
-              liveBackBufferLength: 10,
-              maxBufferLength: 10,
-              maxMaxBufferLength: 30,
-              maxBufferSize: 30 * 1000 * 1000,
-              maxBufferHole: 0.5,
+              // 普通直播流关闭低延迟:仅 LL-HLS 有意义,开着只会让播放点更贴边缘
+              lowLatencyMode: false,
+              liveSyncDuration: 10, // 目标直播延迟:播放点距边缘 10s
+              liveMaxLatencyDuration: 30, // 前向极限 30s,追播缓冲,抗抖动核心
+              liveBackBufferLength: 30,
+              maxBufferLength: 30,
+              maxMaxBufferLength: 60,
+              maxBufferSize: 60 * 1000 * 1000,
+              maxBufferHole: 1, // 1s 内的缓冲空洞直接跳过,避免假性卡顿
               highBufferWatchdogPeriod: 2,
               nudgeMaxRetry: 5,
+              fragLoadingTimeOut: 20000, // 分片 20s 拉不下来即判网络错误
               xhrSetup: (xhr) => { xhr.withCredentials = false },
             })
             hls.loadSource(src)
             hls.attachMedia(video)
             hlsRef.current = hls
+
+            // ---- 诊断:挂在 video 上的卡顿事件(video 元素随 Artplayer 每次重建,无需手动解绑)
+            hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+              const v = hls.media
+              if (!v) return
+              v.addEventListener('waiting', () => { diag.waiting++ })
+              v.addEventListener('stalled', () => { diag.stalled++ })
+              v.addEventListener('playing', () => { diag.playing++ })
+            })
+
+            // ---- 诊断:分片下载耗时(对比分片时长,判断网速能否追平直播产出)
+            hls.on(Hls.Events.FRAG_LOADED, (_e, data) => {
+              const stats = data.frag.stats
+              const ms = Math.round(stats.loading.end - stats.loading.start)
+              diag.fragsLoaded++
+              diag.lastFragMs = ms
+              diag.sumFragMs += ms
+              if (ms > diag.maxFragMs) diag.maxFragMs = ms
+            })
+
             hls.on(Hls.Events.ERROR, (_e, data) => {
               console.log('[Live] HLS error:', data.type, data.details, data.fatal)
               if (data.fatal) {
                 switch (data.type) {
                   case Hls.ErrorTypes.NETWORK_ERROR:
+                    diag.netFatal++
                     // 网络错误:尝试恢复一次,2秒后仍无画面则换线
                     hls.startLoad()
                     if (networkRetryTimerRef.current) clearTimeout(networkRetryTimerRef.current)
@@ -152,6 +200,7 @@ export function useLivePlayer({
                     }, 2000)
                     break
                   case Hls.ErrorTypes.MEDIA_ERROR:
+                    diag.mediaFatal++
                     hls.recoverMediaError()
                     break
                   default:
@@ -297,5 +346,5 @@ export function useLivePlayer({
     }
   }, [currentChannel, currentUrlIndex, currentSourceKey, destroyPlayer, createPlayer, autoSwitchToNextUrl, setError, setErrorType, setPlayerLoading])
 
-  return { containerRef, autoSwitchMsg, blockedUrlsRef, pausePlayer }
+  return { containerRef, autoSwitchMsg, blockedUrlsRef, pausePlayer, hlsRef, diagStatsRef }
 }

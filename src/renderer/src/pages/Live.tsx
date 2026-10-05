@@ -43,6 +43,7 @@ import LiveHeader from './live/LiveHeader'
 import LiveSidebar from './live/LiveSidebar'
 import LiveInfoBar from './live/LiveInfoBar'
 import LiveSourceManagerPanel from './live/LiveSourceManagerPanel'
+import LiveDiagPanel from './live/LiveDiagPanel'
 
 export default function Live() {
   const navigate = useNavigate()
@@ -76,6 +77,8 @@ export default function Live() {
   const [channelNumberVisible, setChannelNumberVisible] = useState(false)
   // 直播源管理面板
   const [showSourceManager, setShowSourceManager] = useState(false)
+  // 播放诊断面板
+  const [showDiag, setShowDiag] = useState(false)
 
   /* ============ ref 镜像 ============ */
   const currentChannelRef = useRef<ChannelItem | null>(null)
@@ -92,7 +95,7 @@ export default function Live() {
   const currentChannelItemRef = useRef<HTMLButtonElement>(null)
 
   /* ============ 播放器 / EPG / 录制 hooks ============ */
-  const { containerRef, autoSwitchMsg, blockedUrlsRef, pausePlayer } = useLivePlayer({
+  const { containerRef, autoSwitchMsg, blockedUrlsRef, pausePlayer, hlsRef, diagStatsRef } = useLivePlayer({
     currentChannel,
     currentUrlIndex,
     currentSourceKey,
@@ -347,6 +350,12 @@ export default function Live() {
             goBack()
           }
           break
+        case 'd':
+        case 'D':
+          // D 键切换播放诊断面板
+          e.preventDefault()
+          setShowDiag(v => !v)
+          break
         default:
           // 数字键 0-9
           if (e.key >= '0' && e.key <= '9') {
@@ -482,7 +491,18 @@ export default function Live() {
         recordingBytes={recordingBytes}
         onGoBack={goBack}
         onToggleRecording={() => { recordingId ? stopRecording() : startRecording() }}
+        onToggleDiag={() => setShowDiag(v => !v)}
+        diagActive={showDiag}
       />
+
+      {/* ============ 播放诊断面板 ============ */}
+      {showDiag && (
+        <LiveDiagPanel
+          hlsRef={hlsRef}
+          diagStatsRef={diagStatsRef}
+          onClose={() => setShowDiag(false)}
+        />
+      )}
 
       {/* ============ 数字键输入提示 ============ */}
       {channelNumberVisible && (

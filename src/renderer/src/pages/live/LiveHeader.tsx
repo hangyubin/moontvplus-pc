@@ -15,6 +15,8 @@ interface LiveHeaderProps {
   recordingBytes: number
   onGoBack: () => void
   onToggleRecording: () => void
+  onToggleDiag: () => void
+  diagActive: boolean
 }
 
 export default function LiveHeader({
@@ -26,6 +28,8 @@ export default function LiveHeader({
   recordingBytes,
   onGoBack,
   onToggleRecording,
+  onToggleDiag,
+  diagActive,
 }: LiveHeaderProps) {
   return (
     <header
@@ -96,6 +100,26 @@ export default function LiveHeader({
             {(recordingBytes / 1024 / 1024).toFixed(1)}MB
           </span>
         )}
+
+        {/* 播放诊断按钮(标题栏图标,激活态高亮) */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleDiag() }}
+          className="flex items-center justify-center w-7 h-7 rounded transition-all"
+          style={diagActive
+            ? {
+                background: 'color-mix(in srgb, var(--color-primary) 22%, transparent)',
+                color: 'var(--color-primary)',
+                border: '1px solid color-mix(in srgb, var(--color-primary) 45%, transparent)',
+              }
+            : {
+                background: 'rgba(255,255,255,0.05)',
+                color: 'rgba(255,255,255,0.6)',
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}
+          title={diagActive ? '关闭播放诊断 (D)' : '播放诊断 (D)'}
+        >
+          <Icon name="activity" size={14} />
+        </button>
 
         {currentChannel && (
           <span className="flex items-center gap-1.5 text-red-400">
