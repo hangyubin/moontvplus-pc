@@ -1,5 +1,6 @@
 import { client } from './api'
 import { hasCustomLive, getCustomLiveSource, getCustomLiveEpg } from './customSource'
+import { getManagedLiveSources, parseLiveSource } from './liveSourceManager'
 import { parseM3U, extractTvgUrl, parseXmltvEpg, parseXmltvFull, normalizeEpgKey, type EpgProgramFull } from './m3u'
 
 export interface LiveSource {
@@ -111,7 +112,52 @@ async function readMaybeGzip(res: Response, url: string): Promise<string> {
   }
 }
 
+/** 获取已启用的托管直播源(源管理面板中添加;key 即源 ID) */
+function getEnabledManaged() {
+  return getManagedLiveSources().filter((s) => s.enabled)
+}
+
+/* ============ 托管源 EPG 缓存(sourceId → 解析结果) ============ */
+interface ManagedEpgCache {
+  simple: Record<string, LiveEpgProgram[]>
+  full: Record<string, EpgProgramFull[]>
+}
+const managedEpgCache = new Map<string, ManagedEpgCache>()
+
+/** 拉取并解析托管源的 EPG:用户手动配置优先,其次 M3U 头部 x-tvg-url */
+async function fetchManagedEpg(sourceId: string): Promise<ManagedEpgCache | null> {
+  if (managedEpgCache.has(sourceId)) return managedEpgCache.get(sourceId)!
+  const parsed = await parseLiveSource(sourceId)
+  const manual = getCustomLiveEpg()
+  const tvgUrl = manual || parsed.tvgUrl
+  if (!tvgUrl) return null
+  try {
+    const controller = new AbortController()
+    const tid = setTimeout(() => controller.abort(), 30000)
+    const res = await fetch(tvgUrl, { signal: controller.signal })
+    clearTimeout(tid)
+    if (!res.ok) return null
+    const xml = await readMaybeGzip(res, tvgUrl)
+    const cache: ManagedEpgCache = { simple: parseXmltvEpg(xml), full: parseXmltvFull(xml) }
+    managedEpgCache.set(sourceId, cache)
+    return cache
+  } catch {
+    return null
+  }
+}
+
 export async function getLiveSources(): Promise<LiveSource[]> {
+  // 优先:源管理面板中已启用的源(可能多个,直播页可切换)
+  const managed = getEnabledManaged()
+  if (managed.length) {
+    return managed.map((s) => ({
+      key: s.id,
+      name: s.name,
+      url: s.url,
+      proxyMode: 'direct',
+      order: 0,
+    }))
+  }
   if (hasCustomLive()) {
     const url = getCustomLiveSource()
     return [
@@ -135,6 +181,18 @@ export async function getLiveSources(): Promise<LiveSource[]> {
 }
 
 export async function getLiveChannels(source: string): Promise<LiveChannel[]> {
+  // 托管源:按 ID 找到后直接拉取/解析其 M3U(本地源读持久化文本,URL 源即时下载)
+  const managed = getEnabledManaged().find((s) => s.id === source)
+  if (managed) {
+    const parsed = await parseLiveSource(source)
+    return parsed.channels.map((c) => ({
+      name: c.name,
+      url: c.url,
+      tvgId: c.tvgId,
+      tvgLogo: c.tvgLogo,
+      group: c.group,
+    }))
+  }
   if (hasCustomLive()) {
     const { channels } = await fetchCustomM3U()
     return channels
@@ -151,6 +209,10 @@ export async function getLiveChannels(source: string): Promise<LiveChannel[]> {
 }
 
 export async function getLiveEpg(source: string, tvgId: string): Promise<LiveEpgProgram[]> {
+  if (getEnabledManaged().some((s) => s.id === source)) {
+    const cache = await fetchManagedEpg(source)
+    return cache?.simple[tvgId] || cache?.simple[normalizeEpgKey(tvgId)] || []
+  }
   if (hasCustomLive()) {
     const map = await fetchCustomEpg()
     return map[tvgId] || map[normalizeEpgKey(tvgId)] || []
@@ -188,6 +250,10 @@ function simpleToFull(programs: LiveEpgProgram[], channel: string): EpgProgramFu
  * - 服务器模式:简易 HH:MM 按今天补齐
  */
 export async function getLiveEpgFull(source: string, tvgId: string): Promise<EpgProgramFull[]> {
+  if (getEnabledManaged().some((s) => s.id === source)) {
+    const cache = await fetchManagedEpg(source)
+    return cache?.full[tvgId] || cache?.full[normalizeEpgKey(tvgId)] || []
+  }
   if (hasCustomLive()) {
     await fetchCustomEpg()
     return cachedEpgFullMap?.[tvgId] || cachedEpgFullMap?.[normalizeEpgKey(tvgId)] || []
@@ -201,6 +267,7 @@ export function clearLiveEpgCache(): void {
   cachedEpgUrl = ''
   cachedEpgMap = null
   cachedEpgFullMap = null
+  managedEpgCache.clear()
 }
 
 export async function precheckLive(url: string, source: string): Promise<string> {

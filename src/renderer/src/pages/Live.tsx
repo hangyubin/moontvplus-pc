@@ -45,6 +45,9 @@ import LiveInfoBar from './live/LiveInfoBar'
 import LiveSourceManagerPanel from './live/LiveSourceManagerPanel'
 import LiveDiagPanel from './live/LiveDiagPanel'
 
+/** 单频道最多保留的线路数(IPTV 源同名频道镜像过多无意义,超出部分丢弃) */
+const MAX_URLS_PER_CHANNEL = 5
+
 export default function Live() {
   const navigate = useNavigate()
 
@@ -95,7 +98,7 @@ export default function Live() {
   const currentChannelItemRef = useRef<HTMLButtonElement>(null)
 
   /* ============ 播放器 / EPG / 录制 hooks ============ */
-  const { containerRef, autoSwitchMsg, blockedUrlsRef, pausePlayer, hlsRef, diagStatsRef } = useLivePlayer({
+  const { containerRef, autoSwitchMsg, blockedUrlsRef, pausePlayer, hlsRef, diagStatsRef, resetAutoSwitchCounters } = useLivePlayer({
     currentChannel,
     currentUrlIndex,
     currentSourceKey,
@@ -172,7 +175,11 @@ export default function Live() {
         // 过滤掉指向 127.0.0.1 的无效地址
         if (ch.url && ch.url.includes('127.0.0.1')) continue
         if (map.has(name)) {
-          map.get(name)!.urls.push(ch.url)
+          const item = map.get(name)!
+          // 同名频道聚合为多线路:URL 去重且最多保留 5 条
+          if (item.urls.length < MAX_URLS_PER_CHANNEL && !item.urls.includes(ch.url)) {
+            item.urls.push(ch.url)
+          }
         } else {
           map.set(name, {
             name,
@@ -238,9 +245,11 @@ export default function Live() {
   const switchUrl = useCallback((dir: 1 | -1) => {
     const ch = currentChannelRef.current
     if (!ch || ch.urls.length <= 1) return
+    // 用户手动切线路:重置自动换线轮次/冷却与屏蔽表,尊重用户选择
+    resetAutoSwitchCounters()
     const idx = currentUrlIndexRef.current
     setCurrentUrlIndex((idx + dir + ch.urls.length) % ch.urls.length)
-  }, [])
+  }, [resetAutoSwitchCounters, setCurrentUrlIndex])
 
   /* ============ 换台(清空屏蔽列表,新频道重新尝试所有线路) ============ */
   const switchChannel = useCallback((dir: 1 | -1) => {
@@ -485,6 +494,7 @@ export default function Live() {
       <LiveHeader
         currentSourceName={currentSourceName}
         currentChannel={currentChannel}
+        currentUrlIndex={currentUrlIndex}
         currentNextProgram={currentNextProgram}
         epgLoading={epgLoading}
         recordingId={recordingId}

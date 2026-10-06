@@ -9,6 +9,8 @@ import type { ChannelItem } from './types'
 interface LiveHeaderProps {
   currentSourceName: string
   currentChannel: ChannelItem | null
+  /** 当前播放线路索引(0 起):用于 LIVE 后的线路标识 */
+  currentUrlIndex: number
   currentNextProgram: CurrentNextProgram
   epgLoading: boolean
   recordingId: string | null
@@ -19,9 +21,17 @@ interface LiveHeaderProps {
   diagActive: boolean
 }
 
+const CN_DIGITS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
+/** 线路索引 → 中文标识(0→一线,1→二线…;超过 10 显示 线路N) */
+function lineLabel(urlIndex: number): string {
+  const n = urlIndex + 1
+  return n >= 1 && n <= 10 ? `${CN_DIGITS[n - 1]}线` : `线路${n}`
+}
+
 export default function LiveHeader({
   currentSourceName,
   currentChannel,
+  currentUrlIndex,
   currentNextProgram,
   epgLoading,
   recordingId,
@@ -122,9 +132,18 @@ export default function LiveHeader({
         </button>
 
         {currentChannel && (
-          <span className="flex items-center gap-1.5 text-red-400">
-            <span className="w-1.5 h-1.5 bg-red-500 animate-pulse" />LIVE
-          </span>
+          <>
+            <span className="flex items-center gap-1.5 text-red-400">
+              <span className="w-1.5 h-1.5 bg-red-500 animate-pulse" />LIVE
+            </span>
+            {/* 线路标识:当前播放的线路序号(随自动/手动换线实时更新) */}
+            <span
+              className="text-xs text-white/50 tabular-nums"
+              title={`当前线路 ${currentUrlIndex + 1}/${currentChannel.urls.length}`}
+            >
+              {lineLabel(currentUrlIndex)}
+            </span>
+          </>
         )}
         <div className="w-px h-4 bg-white/10" />
       </div>

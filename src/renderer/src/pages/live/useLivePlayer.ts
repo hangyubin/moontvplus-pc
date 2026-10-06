@@ -7,6 +7,13 @@ import Hls from 'hls.js'
 import { saveLiveMemory } from './types'
 import type { ChannelItem } from './types'
 
+/** 播放中途卡死判定:连续多少秒进度不推进就自动换线 */
+const MID_STALL_LIMIT_SEC = 6
+/** 两次自动换线最小间隔(冷却):给新线路足够的起播/缓冲时间,避免频繁切换 */
+const AUTO_SWITCH_COOLDOWN_MS = 15000
+/** 同一频道连续自动换线上限:超过即停止并提示手动处理,避免无限循环 */
+const AUTO_SWITCH_MAX_ROUND = 4
+
 interface UseLivePlayerOptions {
   currentChannel: ChannelItem | null
   currentUrlIndex: number
@@ -36,9 +43,17 @@ export function useLivePlayer({
   const retryCountRef = useRef(0)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const networkRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** 播放中途卡死看门狗定时器(每秒检查一次播放进度是否推进) */
+  const stallWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const blockedUrlsRef = useRef<Set<string>>(new Set())
   const currentUrlRef = useRef<string>('')
   const autoSwitchRef = useRef<(url: string) => void>(() => {})
+  /** 上次自动换线时间戳(冷却门控,0 表示尚无自动换线) */
+  const lastAutoSwitchAtRef = useRef(0)
+  /** 本轮(同一频道)已自动换线次数 */
+  const autoSwitchRoundRef = useRef(0)
+  /** 上次播放的频道名:检测换频道时重置自动换线计数 */
+  const lastChannelNameRef = useRef('')
 
   /** 诊断统计(诊断面板每秒读取):
    * - waiting/stalled:缓冲耗尽事件次数,区分"网络型卡顿"
@@ -67,6 +82,7 @@ export function useLivePlayer({
     // 清除重试定时器
     if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null }
     if (networkRetryTimerRef.current) { clearTimeout(networkRetryTimerRef.current); networkRetryTimerRef.current = null }
+    if (stallWatchdogRef.current) { clearInterval(stallWatchdogRef.current); stallWatchdogRef.current = null }
     retryCountRef.current = 0
     if (art && !art.isDestroy) {
       try { art.pause() } catch {}
@@ -91,6 +107,7 @@ export function useLivePlayer({
     hlsRef.current = null
     if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null }
     if (networkRetryTimerRef.current) { clearTimeout(networkRetryTimerRef.current); networkRetryTimerRef.current = null }
+    if (stallWatchdogRef.current) { clearInterval(stallWatchdogRef.current); stallWatchdogRef.current = null }
     if (art && !art.isDestroy) { try { art.pause() } catch {} }
     setTimeout(() => {
       if (hls) { try { hls.destroy() } catch {} }
@@ -139,36 +156,84 @@ export function useLivePlayer({
             diag.netFatal = 0; diag.mediaFatal = 0
             diag.fragsLoaded = 0; diag.lastFragMs = 0; diag.maxFragMs = 0; diag.sumFragMs = 0
 
-            // 直播缓冲配置(方案A):
-            // 旧配置 maxBufferLength=10s + liveSyncCount=3,前向缓冲常不足 10s,网络微抖即卡;
-            // 现统一用 Duration 族(秒)拉大直播延迟与缓冲——禁止与 Count 族混用,否则抛 Illegal config
+            // 直播缓冲配置(方案A + 二次优化):
+            // 统一用 Duration 族(秒)——禁止与 Count 族混用,否则抛 Illegal config。
+            // 二次优化对标 ExoPlayer 默认(minBuffer≈15s / maxBuffer≈50s),进一步拉大缓冲、
+            // 增强弱网重试,向 APP 播放流畅度靠拢;代价仅直播延迟约 12s,电视直播源本身延迟高,无感
             const hls = new Hls({
               liveDurationInfinity: true,
               // 普通直播流关闭低延迟:仅 LL-HLS 有意义,开着只会让播放点更贴边缘
               lowLatencyMode: false,
-              liveSyncDuration: 10, // 目标直播延迟:播放点距边缘 10s
-              liveMaxLatencyDuration: 30, // 前向极限 30s,追播缓冲,抗抖动核心
+              liveSyncDuration: 12, // 目标直播延迟:播放点距边缘 12s(原 10s)
+              liveMaxLatencyDuration: 40, // 追播极限 40s(原 30s),抗抖动核心
               liveBackBufferLength: 30,
-              maxBufferLength: 30,
-              maxMaxBufferLength: 60,
-              maxBufferSize: 60 * 1000 * 1000,
+              maxBufferLength: 45, // 正常缓冲水位 45s(原 30s),接近 ExoPlayer maxBuffer
+              maxMaxBufferLength: 90, // 网络好时最多囤 90s(原 60s)
+              maxBufferSize: 120 * 1000 * 1000, // 缓冲大小上限 120MB(原 60MB),高清多路流更从容
               maxBufferHole: 1, // 1s 内的缓冲空洞直接跳过,避免假性卡顿
               highBufferWatchdogPeriod: 2,
-              nudgeMaxRetry: 5,
+              nudgeMaxRetry: 6, // 卡住时主动跳变的次数(原 5)
               fragLoadingTimeOut: 20000, // 分片 20s 拉不下来即判网络错误
+              // 弱网重试更充分:靠重试扛过短时波动,而不是轻易判死换线
+              manifestLoadingMaxRetry: 4,
+              levelLoadingMaxRetry: 4,
+              fragLoadingMaxRetry: 6,
               xhrSetup: (xhr) => { xhr.withCredentials = false },
             })
             hls.loadSource(src)
             hls.attachMedia(video)
             hlsRef.current = hls
 
-            // ---- 诊断:挂在 video 上的卡顿事件(video 元素随 Artplayer 每次重建,无需手动解绑)
+            // ---- 诊断 + 卡死看门狗(video 随 Artplayer 每次重建,元素级监听无需手动解绑)
             hls.on(Hls.Events.MEDIA_ATTACHED, () => {
               const v = hls.media
               if (!v) return
               v.addEventListener('waiting', () => { diag.waiting++ })
               v.addEventListener('stalled', () => { diag.stalled++ })
               v.addEventListener('playing', () => { diag.playing++ })
+
+              /* ---- 播放中途卡死自动换线 ----
+               * 起播成功后才武装;每秒核对:未被用户暂停且进度连续 6s 不推进
+               * (缓冲耗尽/分片拉不动/解码挂死),判定为中途卡死,屏蔽当前线路并自动换线。
+               * 一旦触发立即停掉看门狗,换线 effect 会销毁并重建整套播放器 */
+              let armed = false
+              let lastTime = -1
+              let stuckSec = 0
+              v.addEventListener('playing', () => {
+                armed = true
+                lastTime = v.currentTime
+                stuckSec = 0
+              })
+              v.addEventListener('timeupdate', () => {
+                // 进度有推进就清零卡死计数(用时间比较,避免同一秒内重复回调误判)
+                if (v.currentTime !== lastTime) {
+                  lastTime = v.currentTime
+                  stuckSec = 0
+                }
+              })
+              stallWatchdogRef.current = setInterval(() => {
+                // 用户手动暂停 / 尚未起播:不监测
+                if (!armed || v.paused) { stuckSec = 0; return }
+                // readyState<3(数据不足)或时间戳停住:累计卡死秒数
+                if (v.readyState < 3 || v.currentTime === lastTime) {
+                  stuckSec++
+                  if (stuckSec >= MID_STALL_LIMIT_SEC) {
+                    // 冷却门控:距上次自动换线不足 15s 则继续等待(卡死计数保留,
+                    // 冷却一到的下一秒立即触发),给新线路完整的起播/缓冲机会
+                    if (lastAutoSwitchAtRef.current &&
+                      Date.now() - lastAutoSwitchAtRef.current < AUTO_SWITCH_COOLDOWN_MS) {
+                      return
+                    }
+                    if (stallWatchdogRef.current) {
+                      clearInterval(stallWatchdogRef.current)
+                      stallWatchdogRef.current = null
+                    }
+                    autoSwitchRef.current(src)
+                  }
+                } else {
+                  stuckSec = 0
+                }
+              }, 1000)
             })
 
             // ---- 诊断:分片下载耗时(对比分片时长,判断网速能否追平直播产出)
@@ -236,6 +301,15 @@ export function useLivePlayer({
     const ch = currentChannelRef.current
     if (!ch) return
     blockedUrlsRef.current.add(failedUrl)
+
+    // 次数上限:同一频道已自动换满 4 条线路仍不行,停止切换并提示手动处理
+    if (autoSwitchRoundRef.current >= AUTO_SWITCH_MAX_ROUND) {
+      setErrorType('play')
+      setError('已自动尝试多条线路仍无法流畅播放，请手动换台或稍后再试')
+      setPlayerLoading(false)
+      return
+    }
+
     // 找下一个未屏蔽的 URL
     const total = ch.urls.length
     for (let i = 1; i <= total; i++) {
@@ -245,6 +319,9 @@ export function useLivePlayer({
         setAutoSwitchMsg(`线路 ${currentUrlIndexRef.current + 1} 无法播放，自动切换到线路 ${nextIdx + 1}`)
         // 3秒后清除提示
         setTimeout(() => setAutoSwitchMsg(''), 3000)
+        // 记录本轮自动换线:次数+1、刷新冷却计时起点
+        autoSwitchRoundRef.current += 1
+        lastAutoSwitchAtRef.current = Date.now()
         setCurrentUrlIndex(nextIdx)
         return
       }
@@ -261,6 +338,13 @@ export function useLivePlayer({
   /* ============ 选中频道/切换 URL 后自动播放 + 保存记忆 ============ */
   useEffect(() => {
     if (!currentChannel) return
+    // 切换到不同频道:重置自动换线轮次/冷却/屏蔽表,新一轮计数从头开始
+    if (lastChannelNameRef.current !== currentChannel.name) {
+      lastChannelNameRef.current = currentChannel.name
+      autoSwitchRoundRef.current = 0
+      lastAutoSwitchAtRef.current = 0
+      blockedUrlsRef.current.clear()
+    }
     if (currentSourceKey) {
       saveLiveMemory({ sourceKey: currentSourceKey, channelName: currentChannel.name, urlIndex: currentUrlIndex })
     }
@@ -346,5 +430,13 @@ export function useLivePlayer({
     }
   }, [currentChannel, currentUrlIndex, currentSourceKey, destroyPlayer, createPlayer, autoSwitchToNextUrl, setError, setErrorType, setPlayerLoading])
 
-  return { containerRef, autoSwitchMsg, blockedUrlsRef, pausePlayer, hlsRef, diagStatsRef }
+  /** 用户手动切换线路(←→键)时调用:重置自动轮次/冷却,并清空屏蔽表,
+   *  尊重用户的明确选择(即便该线路之前被自动判坏,也给一次重试机会) */
+  const resetAutoSwitchCounters = useCallback(() => {
+    autoSwitchRoundRef.current = 0
+    lastAutoSwitchAtRef.current = 0
+    blockedUrlsRef.current.clear()
+  }, [])
+
+  return { containerRef, autoSwitchMsg, blockedUrlsRef, pausePlayer, hlsRef, diagStatsRef, resetAutoSwitchCounters }
 }
