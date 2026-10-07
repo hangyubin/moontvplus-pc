@@ -91,7 +91,7 @@ export interface SearchResource {
 
 /** SSE 搜索事件 */
 export type SearchSSEEvent =
-  | { type: 'start'; query: string; totalSources: number; timestamp: number }
+  | { type: 'start'; query: string; totalSources: number; skippedSources?: number; timestamp: number }
   | { type: 'source_result'; source: string; sourceName: string; results: SearchResult[]; timestamp: number }
   | { type: 'source_error'; source: string; sourceName: string; error: string; timestamp: number }
   | { type: 'complete'; totalResults: number; completedSources: number; timestamp: number }

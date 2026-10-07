@@ -25,6 +25,7 @@
  */
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePowerSave } from '../lib/usePowerSave'
 import {
   getLiveSources,
   getLiveChannels,
@@ -44,6 +45,9 @@ import LiveSidebar from './live/LiveSidebar'
 import LiveInfoBar from './live/LiveInfoBar'
 import LiveSourceManagerPanel from './live/LiveSourceManagerPanel'
 import LiveDiagPanel from './live/LiveDiagPanel'
+import LiveSpeedPanel from './live/LiveSpeedPanel'
+import { measureLine, recordSpeed, formatSpeed, type LineSpeed } from '../lib/liveSpeedTest'
+import { lineLabel } from './live/LiveHeader'
 
 /** 单频道最多保留的线路数(IPTV 源同名频道镜像过多无意义,超出部分丢弃) */
 const MAX_URLS_PER_CHANNEL = 5
@@ -82,6 +86,8 @@ export default function Live() {
   const [showSourceManager, setShowSourceManager] = useState(false)
   // 播放诊断面板
   const [showDiag, setShowDiag] = useState(false)
+  /** 线路测速面板:null=关闭,否则按线路索引保存结果 */
+  const [speedPanel, setSpeedPanel] = useState<{ running: boolean; results: (LineSpeed | undefined)[] } | null>(null)
 
   /* ============ ref 镜像 ============ */
   const currentChannelRef = useRef<ChannelItem | null>(null)
@@ -98,6 +104,7 @@ export default function Live() {
   const currentChannelItemRef = useRef<HTMLButtonElement>(null)
 
   /* ============ 播放器 / EPG / 录制 hooks ============ */
+  const [livePlaying, setLivePlaying] = useState(false)
   const { containerRef, autoSwitchMsg, blockedUrlsRef, pausePlayer, hlsRef, diagStatsRef, resetAutoSwitchCounters } = useLivePlayer({
     currentChannel,
     currentUrlIndex,
@@ -108,9 +115,12 @@ export default function Live() {
     setError,
     setErrorType,
     setPlayerLoading,
+    onPlayingChange: setLivePlaying,
   })
   const { epgLoading, currentNextProgram } = useLiveEpg(currentChannel, currentSourceKey)
   const { recordingId, recordingBytes, startRecording, stopRecording } = useLiveRecording(currentChannel, currentUrlIndex)
+  // 防休眠:直播播放中屏幕常亮;仅录制中(可能已暂停观看)则只阻止系统睡眠
+  usePowerSave(recordingId ? 'audio' : livePlaying ? 'video' : null)
 
   const toggleGroup = useCallback((key: string) => {
     setCollapsedGroups((prev) => {
@@ -249,6 +259,45 @@ export default function Live() {
     resetAutoSwitchCounters()
     const idx = currentUrlIndexRef.current
     setCurrentUrlIndex((idx + dir + ch.urls.length) % ch.urls.length)
+  }, [resetAutoSwitchCounters, setCurrentUrlIndex])
+
+  /* ============ 全部线路测速:完成后自动切到最快线路 ============ */
+  const runSpeedTest = useCallback(async () => {
+    const ch = currentChannelRef.current
+    if (!ch || ch.urls.length === 0) return
+    const results: (LineSpeed | undefined)[] = new Array(ch.urls.length).fill(undefined)
+    setSpeedPanel({ running: true, results })
+    // 并发测速(最多 5 条),每条出结果即刷新面板
+    await Promise.all(ch.urls.map(async (u, i) => {
+      const r = await measureLine(u)
+      results[i] = r
+      if (r.ok) recordSpeed(u, r)
+      setSpeedPanel({ running: true, results: [...results] })
+    }))
+    setSpeedPanel({ running: false, results: [...results] })
+    // 选出最快线路
+    let best = -1
+    let bestKbps = 0
+    results.forEach((r, i) => {
+      if (r?.ok && r.kbps > bestKbps) { bestKbps = r.kbps; best = i }
+    })
+    if (best < 0) {
+      toast.error('测速失败:所有线路均无法连接')
+      return
+    }
+    if (best !== currentUrlIndexRef.current) {
+      resetAutoSwitchCounters()
+      setCurrentUrlIndex(best)
+      toast.success(`测速完成，已切换到最快线路（${lineLabel(best)} · ${formatSpeed(bestKbps)}）`)
+    } else {
+      toast.info(`测速完成，当前线路已是最快（${formatSpeed(bestKbps)}）`)
+    }
+  }, [resetAutoSwitchCounters, setCurrentUrlIndex])
+
+  /** 测速面板中手动点选线路 */
+  const pickSpeedLine = useCallback((idx: number) => {
+    resetAutoSwitchCounters()
+    setCurrentUrlIndex(idx)
   }, [resetAutoSwitchCounters, setCurrentUrlIndex])
 
   /* ============ 换台(清空屏蔽列表,新频道重新尝试所有线路) ============ */
@@ -503,6 +552,8 @@ export default function Live() {
         onToggleRecording={() => { recordingId ? stopRecording() : startRecording() }}
         onToggleDiag={() => setShowDiag(v => !v)}
         diagActive={showDiag}
+        onSpeedTest={runSpeedTest}
+        speedTesting={speedPanel?.running ?? false}
       />
 
       {/* ============ 播放诊断面板 ============ */}
@@ -511,6 +562,17 @@ export default function Live() {
           hlsRef={hlsRef}
           diagStatsRef={diagStatsRef}
           onClose={() => setShowDiag(false)}
+        />
+      )}
+
+      {/* ============ 线路测速面板 ============ */}
+      {speedPanel && (
+        <LiveSpeedPanel
+          results={speedPanel.results}
+          running={speedPanel.running}
+          currentUrlIndex={currentUrlIndex}
+          onClose={() => setSpeedPanel(null)}
+          onPick={pickSpeedLine}
         />
       )}
 

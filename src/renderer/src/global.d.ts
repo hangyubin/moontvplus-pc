@@ -6,6 +6,10 @@ export interface WindowApi {
     getAll: () => Promise<Record<string, unknown>>
   }
   platform: string
+  power: {
+    acquire: (mode: 'video' | 'audio') => Promise<string>
+    release: (token: string) => Promise<boolean>
+  }
   window: {
     minimize: () => Promise<void>
     maximize: () => Promise<void>

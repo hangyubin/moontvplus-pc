@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback, type MutableRefObject } from 
 import Artplayer from 'artplayer'
 import Hls from 'hls.js'
 import { saveLiveMemory } from './types'
+import { getKnownSpeed } from '../../lib/liveSpeedTest'
 import type { ChannelItem } from './types'
 
 /** 播放中途卡死判定:连续多少秒进度不推进就自动换线 */
@@ -13,6 +14,35 @@ const MID_STALL_LIMIT_SEC = 6
 const AUTO_SWITCH_COOLDOWN_MS = 15000
 /** 同一频道连续自动换线上限:超过即停止并提示手动处理,避免无限循环 */
 const AUTO_SWITCH_MAX_ROUND = 4
+
+/* ============ 线路编码记忆 ============
+ * HEVC(hvc1/hev1) 在 Electron/Chromium 下常退化为 CPU 软解导致卡顿,
+ * 播放时记录每条线路的编码类型,自动换线时优先绕开已知 HEVC 线路 */
+const CODEC_STORE_KEY = 'mtvp:live:codecs'
+const CODEC_STORE_MAX = 500
+
+function readCodecMap(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(CODEC_STORE_KEY)
+    const obj = raw ? JSON.parse(raw) : {}
+    return obj && typeof obj === 'object' ? obj : {}
+  } catch {
+    return {}
+  }
+}
+
+function recordUrlCodec(url: string, kind: 'hevc' | 'other'): void {
+  try {
+    const map = readCodecMap()
+    if (map[url] === kind) return
+    const keys = Object.keys(map)
+    if (keys.length >= CODEC_STORE_MAX && map[url] === undefined) delete map[keys[0]]
+    map[url] = kind
+    localStorage.setItem(CODEC_STORE_KEY, JSON.stringify(map))
+  } catch {
+    // 存储失败不影响播放
+  }
+}
 
 interface UseLivePlayerOptions {
   currentChannel: ChannelItem | null
@@ -24,6 +54,8 @@ interface UseLivePlayerOptions {
   setError: (msg: string) => void
   setErrorType: (type: 'load' | 'play') => void
   setPlayerLoading: (loading: boolean) => void
+  /** 播放状态变化回调(用于驱动防休眠) */
+  onPlayingChange?: (playing: boolean) => void
 }
 
 export function useLivePlayer({
@@ -36,6 +68,7 @@ export function useLivePlayer({
   setError,
   setErrorType,
   setPlayerLoading,
+  onPlayingChange,
 }: UseLivePlayerOptions) {
   const containerRef = useRef<HTMLDivElement>(null)
   const artRef = useRef<Artplayer | null>(null)
@@ -54,6 +87,9 @@ export function useLivePlayer({
   const autoSwitchRoundRef = useRef(0)
   /** 上次播放的频道名:检测换频道时重置自动换线计数 */
   const lastChannelNameRef = useRef('')
+  /** 播放状态回调的 ref 镜像(createPlayer 闭包中始终读最新值) */
+  const onPlayingChangeRef = useRef(onPlayingChange)
+  onPlayingChangeRef.current = onPlayingChange
 
   /** 诊断统计(诊断面板每秒读取):
    * - waiting/stalled:缓冲耗尽事件次数,区分"网络型卡顿"
@@ -236,6 +272,16 @@ export function useLivePlayer({
               }, 1000)
             })
 
+            // ---- 记录当前线路编码(HEVC 标记,供换线时规避)
+            const markCodec = () => {
+              const lvl = hls.levels?.[hls.currentLevel]
+              const codec = lvl?.videoCodec || ''
+              if (!codec || !currentUrlRef.current) return
+              recordUrlCodec(currentUrlRef.current, /hvc1|hev1/i.test(codec) ? 'hevc' : 'other')
+            }
+            hls.on(Hls.Events.MANIFEST_PARSED, markCodec)
+            hls.on(Hls.Events.LEVEL_SWITCHED, markCodec)
+
             // ---- 诊断:分片下载耗时(对比分片时长,判断网速能否追平直播产出)
             hls.on(Hls.Events.FRAG_LOADED, (_e, data) => {
               const stats = data.frag.stats
@@ -284,6 +330,10 @@ export function useLivePlayer({
     art.on('video:playing', () => {
       retryCountRef.current = 0
     })
+    // 播放状态上报:驱动防休眠(直播页播放中屏幕常亮)
+    art.on('video:play', () => onPlayingChangeRef.current?.(true))
+    art.on('video:pause', () => onPlayingChangeRef.current?.(false))
+    art.on('video:ended', () => onPlayingChangeRef.current?.(false))
 
     artRef.current = art
   }, [])
@@ -310,26 +360,42 @@ export function useLivePlayer({
       return
     }
 
-    // 找下一个未屏蔽的 URL
+    // 收集未屏蔽的候选线路(从下一条开始的轮转顺序)
     const total = ch.urls.length
+    const candidates: { idx: number; url: string }[] = []
     for (let i = 1; i <= total; i++) {
       const nextIdx = (currentUrlIndexRef.current + i) % total
       const nextUrl = ch.urls[nextIdx]
       if (nextUrl && !blockedUrlsRef.current.has(nextUrl)) {
-        setAutoSwitchMsg(`线路 ${currentUrlIndexRef.current + 1} 无法播放，自动切换到线路 ${nextIdx + 1}`)
-        // 3秒后清除提示
-        setTimeout(() => setAutoSwitchMsg(''), 3000)
-        // 记录本轮自动换线:次数+1、刷新冷却计时起点
-        autoSwitchRoundRef.current += 1
-        lastAutoSwitchAtRef.current = Date.now()
-        setCurrentUrlIndex(nextIdx)
-        return
+        candidates.push({ idx: nextIdx, url: nextUrl })
       }
     }
-    // 所有线路都被屏蔽了
-    setErrorType('play')
-    setError('所有线路均无法播放，请换台或更换直播源')
-    setPlayerLoading(false)
+    if (candidates.length === 0) {
+      // 所有线路都被屏蔽了
+      setErrorType('play')
+      setError('所有线路均无法播放，请换台或更换直播源')
+      setPlayerLoading(false)
+      return
+    }
+    // 线路优选排序:① HEVC 线路排最后(软解易卡);
+    // ② 非 HEVC 中,有有效测速记录的按速率降序在前,未知线路随后(稳定排序保持原序)
+    const codecMap = readCodecMap()
+    const ordered = [...candidates].sort((a, b) => {
+      const aHevc = codecMap[a.url] === 'hevc'
+      const bHevc = codecMap[b.url] === 'hevc'
+      if (aHevc !== bHevc) return aHevc ? 1 : -1
+      const aKbps = getKnownSpeed(a.url)?.kbps ?? 0
+      const bKbps = getKnownSpeed(b.url)?.kbps ?? 0
+      return bKbps - aKbps
+    })
+    const pick = ordered[0]
+    setAutoSwitchMsg(`线路 ${currentUrlIndexRef.current + 1} 无法播放，自动切换到线路 ${pick.idx + 1}`)
+    // 3秒后清除提示
+    setTimeout(() => setAutoSwitchMsg(''), 3000)
+    // 记录本轮自动换线:次数+1、刷新冷却计时起点
+    autoSwitchRoundRef.current += 1
+    lastAutoSwitchAtRef.current = Date.now()
+    setCurrentUrlIndex(pick.idx)
   }, [currentChannelRef, currentUrlIndexRef, setCurrentUrlIndex, setError, setErrorType, setPlayerLoading])
 
   // 同步到 ref,供 createPlayer 中的 HLS 错误回调使用

@@ -201,6 +201,8 @@ export default function Search() {
  const [viewMode, setViewMode] = useState<ViewMode>('aggregate')
  const [completedSources, setCompletedSources] = useState(0)
  const [totalSources, setTotalSources] = useState(0)
+ // 因健康度冷却被跳过的失效源数量
+ const [skippedSources, setSkippedSources] = useState(0)
  const [errorSources, setErrorSources] = useState<{ source: string; sourceName: string; error: string }[]>([])
  const [history, setHistory] = useState<string[]>([])
  const [hideTrailers, setHideTrailers] = useState(() => {
@@ -322,6 +324,7 @@ export default function Search() {
  if (e.type === 'start') {
  // 搜索开始,设置总源数
  setTotalSources(e.totalSources || 0)
+ setSkippedSources(e.skippedSources || 0)
  } else if (e.type === 'source_result') {
  // 从源头过滤18禁:如果该源本身被标记为NSFW源,直接丢弃整个源的结果
  if (blockNSFW && nsfwSourceKeys.has(e.source)) {
@@ -692,7 +695,7 @@ const handleRecommendClick = useCallback((item: DoubanCategoryItem) => {
  <span className="text-[var(--color-text-quaternary)]">·</span>
  <span className="text-white font-semibold tabular-nums">{searchProgress}%</span>
  <span className="text-[var(--color-text-tertiary)] tabular-nums">
- ({completedSources}/{totalSources || '?'} 源)
+ ({completedSources}/{totalSources || '?'} 源{skippedSources > 0 ? ` · 已跳过${skippedSources}个失效源` : ''})
  </span>
  </div>
  <div className="flex items-center gap-3">

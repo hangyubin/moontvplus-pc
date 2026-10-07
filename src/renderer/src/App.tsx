@@ -2,6 +2,7 @@ import { useEffect, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useStore } from './lib/store'
 import Layout from './components/Layout'
+import ErrorBoundary from './components/ErrorBoundary'
 import { Toaster } from './components/Toast'
 import Home from './pages/Home'
 
@@ -36,12 +37,14 @@ export default function App() {
   if (isFullscreenPage) {
     return (
       <>
-        <Suspense fallback={<PageFallback />}>
-          <Routes>
-            <Route path="/play" element={<Play />} />
-            <Route path="/live" element={<Live />} />
-          </Routes>
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={<PageFallback />}>
+            <Routes>
+              <Route path="/play" element={<Play />} />
+              <Route path="/live" element={<Live />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
         <Toaster />
       </>
     )
@@ -49,21 +52,23 @@ export default function App() {
 
   return (
     <>
-      <Layout>
-        <Suspense fallback={<PageFallback />}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/search" element={<Search />} />
-            <Route path="/detail" element={<Detail />} />
-            <Route path="/history" element={<History />} />
-            <Route path="/favorites" element={<Favorites />} />
-            <Route path="/music" element={<Music />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/login" element={<Navigate to="/settings" replace />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
-      </Layout>
+      <ErrorBoundary>
+        <Layout>
+          <Suspense fallback={<PageFallback />}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/search" element={<Search />} />
+              <Route path="/detail" element={<Detail />} />
+              <Route path="/history" element={<History />} />
+              <Route path="/favorites" element={<Favorites />} />
+              <Route path="/music" element={<Music />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/login" element={<Navigate to="/settings" replace />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+        </Layout>
+      </ErrorBoundary>
       <Toaster />
     </>
   )

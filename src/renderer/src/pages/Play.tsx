@@ -12,6 +12,7 @@ import { getDetail, resolvePlayUrl, searchStream, prepareCustomVideoPlay, needsC
 import { processImageUrl } from '../lib/image'
 import { getDetailWithCache, cacheSearchResults, findSourcesByTitle } from '../lib/searchCache'
 import { useStore } from '../lib/store'
+import { usePowerSave } from '../lib/usePowerSave'
 import { generateStorageKey, type PlayRecord, type SearchResult, type SearchSSEEvent } from '../types'
 import WindowControls from '../components/WindowControls'
 import Icon from '../components/Icon'
@@ -86,6 +87,9 @@ export default function Play() {
  // 换源:可用源列表
  const [altSources, setAltSources] = useState<SearchResult[]>([])
  const [searchingSources, setSearchingSources] = useState(false)
+ // 播放状态:驱动防休眠(播放中屏幕常亮)
+ const [playing, setPlaying] = useState(false)
+ usePowerSave(playing ? 'video' : null)
 
  // 用 useRef 保存当前集数、detail、source、id、title,供 beforeunload 回调读取最新值
  const stateRef = useRef({ index, detail, source, id, title })
@@ -525,6 +529,11 @@ export default function Play() {
  const seekTimers = [1, 2, 3, 5].map((s) => setTimeout(trySeek, s * 1000))
 
  art.on('pause', saveProgress)
+
+ // 播放状态上报:驱动防休眠
+ art.on('video:play', () => setPlaying(true))
+ art.on('video:pause', () => setPlaying(false))
+ art.on('video:ended', () => setPlaying(false))
 
  let lastSave = 0
  art.on('video:timeupdate', () => {

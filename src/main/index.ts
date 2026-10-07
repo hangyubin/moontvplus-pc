@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, session, screen } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, session, screen, powerSaveBlocker } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
 
@@ -12,6 +12,39 @@ interface RecordingSession {
   startTime: number
 }
 const recordingSessions = new Map<string, RecordingSession>()
+
+/* ============ 播放防休眠 ============
+ * 渲染层播放媒体期间按需屏蔽系统休眠:
+ *   video → prevent-display-sleep(视频:屏幕保持常亮,系统不休眠)
+ *   audio → prevent-app-suspension(音乐:允许熄屏,仅阻止系统睡眠)
+ * 多个页面可同时持有,取最强需求生效;全部释放后恢复系统默认休眠策略 */
+type PowerMode = 'video' | 'audio'
+type PowerBlockerType = 'prevent-display-sleep' | 'prevent-app-suspension'
+const powerHolders = new Map<string, PowerMode>()
+let powerBlockerId: number | null = null
+let powerBlockerType: PowerBlockerType | null = null
+let powerTokenSeq = 0
+
+function refreshPowerBlocker(): void {
+  let needed: PowerBlockerType | null = null
+  for (const mode of powerHolders.values()) {
+    if (mode === 'video') {
+      needed = 'prevent-display-sleep'
+      break
+    }
+    needed = 'prevent-app-suspension'
+  }
+  if (needed === powerBlockerType) return
+  if (powerBlockerId !== null && powerSaveBlocker.isStarted(powerBlockerId)) {
+    powerSaveBlocker.stop(powerBlockerId)
+  }
+  powerBlockerId = null
+  powerBlockerType = null
+  if (needed) {
+    powerBlockerId = powerSaveBlocker.start(needed)
+    powerBlockerType = needed
+  }
+}
 
 /**
  * 自定义视频源播放防盗链表:hostname -> { referer, ua }
@@ -45,6 +78,24 @@ if (!gotTheLock) {
 function getStorePath(): string {
   return join(app.getPath('userData'), 'moontvplus-pc-config.json')
 }
+
+/* ============ 崩溃日志 ============
+ * 渲染进程崩溃与主进程未捕获异常追加写入 userData/crash.log,便于排障 */
+function appendCrashLog(kind: string, detail: string): void {
+  try {
+    const line = `[${new Date().toISOString()}] ${kind}: ${detail}\n`
+    fs.appendFileSync(join(app.getPath('userData'), 'crash.log'), line, 'utf-8')
+  } catch {
+    // 日志失败不抛出,避免崩溃处理路径自身再崩
+  }
+}
+
+process.on('uncaughtException', (err) => {
+  appendCrashLog('main-uncaughtException', err?.stack || String(err))
+})
+process.on('unhandledRejection', (reason) => {
+  appendCrashLog('main-unhandledRejection', String(reason))
+})
 
 function readStore(): Record<string, unknown> {
   try {
@@ -218,7 +269,12 @@ function createWindow(): void {
       // 无效 URL,忽略
     }
     return { action: 'deny' }
-  })
+    })
+
+    // 渲染进程崩溃记录(白屏排查线索)
+    mainWindow.webContents.on('render-process-gone', (_e, details) => {
+      appendCrashLog('render-process-gone', `${details.reason} exitCode=${details.exitCode}`)
+    })
 
   // 窗口状态变化时保存(防抖:延迟 500ms 避免频繁写入)
   let saveTimer: NodeJS.Timeout | null = null
@@ -257,6 +313,19 @@ app.whenReady().then(() => {
     return true
   })
   ipcMain.handle('store:getAll', () => readStore())
+
+  // 播放防休眠:渲染层播放开始/结束时报备,主进程按持有者集合启停 powerSaveBlocker
+  ipcMain.handle('power:acquire', (_e, mode: PowerMode) => {
+    const token = `pw_${++powerTokenSeq}`
+    powerHolders.set(token, mode === 'video' ? 'video' : 'audio')
+    refreshPowerBlocker()
+    return token
+  })
+  ipcMain.handle('power:release', (_e, token: string) => {
+    powerHolders.delete(String(token))
+    refreshPowerBlocker()
+    return true
+  })
 
   // 窗口控制 IPC
   ipcMain.handle('window:minimize', () => mainWindow?.minimize())

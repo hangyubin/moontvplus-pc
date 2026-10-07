@@ -19,11 +19,14 @@ interface LiveHeaderProps {
   onToggleRecording: () => void
   onToggleDiag: () => void
   diagActive: boolean
+  /** 启动全部线路测速 */
+  onSpeedTest: () => void
+  speedTesting: boolean
 }
 
 const CN_DIGITS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
 /** 线路索引 → 中文标识(0→一线,1→二线…;超过 10 显示 线路N) */
-function lineLabel(urlIndex: number): string {
+export function lineLabel(urlIndex: number): string {
   const n = urlIndex + 1
   return n >= 1 && n <= 10 ? `${CN_DIGITS[n - 1]}线` : `线路${n}`
 }
@@ -40,6 +43,8 @@ export default function LiveHeader({
   onToggleRecording,
   onToggleDiag,
   diagActive,
+  onSpeedTest,
+  speedTesting,
 }: LiveHeaderProps) {
   return (
     <header
@@ -109,6 +114,29 @@ export default function LiveHeader({
           <span className="text-white/30 text-[10px] tabular-nums">
             {(recordingBytes / 1024 / 1024).toFixed(1)}MB
           </span>
+        )}
+
+        {/* 全部线路测速(测速完成后自动切到最快线路) */}
+        {currentChannel && currentChannel.urls.length > 1 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); if (!speedTesting) onSpeedTest() }}
+            className="flex items-center justify-center w-7 h-7 rounded transition-all"
+            style={speedTesting
+              ? {
+                  background: 'color-mix(in srgb, var(--color-primary) 22%, transparent)',
+                  color: 'var(--color-primary)',
+                  border: '1px solid color-mix(in srgb, var(--color-primary) 45%, transparent)',
+                }
+              : {
+                  background: 'rgba(255,255,255,0.05)',
+                  color: 'rgba(255,255,255,0.6)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                }}
+            title="线路测速(自动切换最快线路)"
+            disabled={speedTesting}
+          >
+            <Icon name="gauge" size={14} className={speedTesting ? 'animate-pulse' : ''} />
+          </button>
         )}
 
         {/* 播放诊断按钮(标题栏图标,激活态高亮) */}

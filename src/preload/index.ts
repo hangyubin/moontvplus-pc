@@ -7,6 +7,12 @@ const api = {
     getAll: () => ipcRenderer.invoke('store:getAll')
   },
   platform: process.platform,
+  power: {
+    /** 播放开始:申请阻止系统休眠(video=屏幕常亮,audio=仅阻止睡眠),返回释放令牌 */
+    acquire: (mode: 'video' | 'audio') => ipcRenderer.invoke('power:acquire', mode) as Promise<string>,
+    /** 播放结束/暂停/页面卸载:释放令牌 */
+    release: (token: string) => ipcRenderer.invoke('power:release', token) as Promise<boolean>
+  },
   media: {
     /** 注册自定义视频流(m3u8 域名)的防盗链 Referer/UA,主进程播放时注入 */
     setVideoHeaders: (payload: { url: string; referer?: string; ua?: string }) =>

@@ -24,6 +24,7 @@ import { useMusicSearch } from './music/useMusicSearch'
 import { useSpectrumCore, useSpectrumRender } from './music/useSpectrum'
 import { useMusicPlayer } from './music/useMusicPlayer'
 import { useLyrics } from './music/useLyrics'
+import { usePowerSave } from '../lib/usePowerSave'
 import MusicHeader from './music/MusicHeader'
 import MusicBoardTabs from './music/MusicBoardTabs'
 import MusicSongList from './music/MusicSongList'
@@ -56,6 +57,8 @@ export default function Music() {
     quality
   })
   useSpectrumRender(spectrum, player.isPlaying)
+  // 防休眠:音乐播放中仅阻止系统睡眠,允许屏幕正常熄灭
+  usePowerSave(player.isPlaying ? 'audio' : null)
 
   /* ============ 歌词 ============ */
   const lyric = useLyrics(player.lyricData, player.currentTime, player.duration)

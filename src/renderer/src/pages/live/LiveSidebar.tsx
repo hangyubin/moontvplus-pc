@@ -303,6 +303,9 @@ export default function LiveSidebar({
                               key={`${group}-${idx}-${ch.name}`}
                               ref={isCurrent ? currentChannelItemRef : null}
                               onClick={() => onSelectChannel(currentSourceKey, ch)}
+                              /* 大列表性能:屏外行跳过渲染(等同虚拟化效果),
+                                 auto 关键字保留上次渲染尺寸,滚动条不跳动 */
+                              style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 57px' }}
                               className={`w-full text-left flex items-center gap-2 px-2 py-2 transition-all duration-200 group ${
                                 isCurrent ? 'bg-primary/20' : 'hover:bg-white/5'
                               }`}

@@ -2,6 +2,7 @@
  * MoonTVPlus API 客户端
  * 封装所有服务端接口,基于 createApiClient()(带认证拦截)
  */
+import { filterHealthySites, markSourceOk, markSourceFail } from './sourceHealth'
 import type {
   PlayRecord,
   PlayRecordMap,
@@ -632,9 +633,11 @@ export function searchStream(
           onEvent({ type: 'complete', totalResults: 0, completedSources: 1, timestamp: Date.now() })
           return
         }
-        // 权重高的源优先入队,配合并发池让优质源更早返回;事件仍按完成顺序发出
-        const orderedSites = sortSitesByWeight(sites)
-        onEvent({ type: 'start', query, totalSources: orderedSites.length, timestamp: Date.now() })
+        // 权重高的源优先入队,配合并发池让优质源更早返回;事件仍按完成顺序发出。
+        // 源健康度:冷却中的死站本次跳过(到期自愈),避免每次搜索都等它超时
+        const orderedAll = sortSitesByWeight(sites)
+        const [orderedSites, skippedSources] = filterHealthySites(orderedAll)
+        onEvent({ type: 'start', query, totalSources: orderedSites.length, skippedSources, timestamp: Date.now() })
         let totalResults = 0
         let completedSources = 0
         // 限流并发:代理型源(format=1/3)全部子站共用代理主机,降为 5 避免
@@ -643,6 +646,7 @@ export function searchStream(
           if (controller.signal.aborted) return
           try {
             const results = await searchCustomSite(site, query)
+            markSourceOk(site.key)
             if (controller.signal.aborted) return
             totalResults += results.length
             completedSources++
@@ -655,6 +659,8 @@ export function searchStream(
             })
           } catch (e) {
             if (controller.signal.aborted) return
+            // 超时/网络错误/HTTP 错误:累计失败,达阈值后进冷却期
+            markSourceFail(site.key)
             completedSources++
             onEvent({
               type: 'source_error',
