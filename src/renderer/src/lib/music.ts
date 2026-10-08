@@ -612,9 +612,11 @@ function upsertLocalList(songs: MusicSong[], song: MusicSong, max: number): Musi
   return [song, ...filtered].slice(0, max)
 }
 
-/** 播放时调用:置顶加入本地播放列表并持久化,返回新列表 */
+/** 播放时调用:已在列表中不移动位置(保留播放顺序);不在列表则追加到末尾并持久化 */
 export function addToLocalPlaylist(songs: MusicSong[], song: MusicSong): MusicSong[] {
-  const next = upsertLocalList(songs, song, PLAYLIST_MAX)
+  const key = musicSongKey(song)
+  if (songs.some((s) => musicSongKey(s) === key)) return songs // 已存在,保持原位
+  const next = [...songs, song].slice(0, PLAYLIST_MAX) // 新歌曲追加到末尾
   writeLocalSongs(LOCAL_PLAYLIST_KEY, next)
   return next
 }
