@@ -1,5 +1,5 @@
 import { client } from './api'
-import { hasCustomLive, getCustomLiveSource, getCustomLiveEpg } from './customSource'
+import { hasCustomLive, getCustomLiveSource, getCustomLiveEpg, getCustomLiveName } from './customSource'
 import { getManagedLiveSources, parseLiveSource } from './liveSourceManager'
 import { parseM3U, extractTvgUrl, parseXmltvEpg, parseXmltvFull, normalizeEpgKey, type EpgProgramFull } from './m3u'
 
@@ -163,7 +163,7 @@ export async function getLiveSources(): Promise<LiveSource[]> {
     return [
       {
         key: CUSTOM_KEY,
-        name: '自定义直播',
+        name: getCustomLiveName() || '自定义直播',
         url,
         proxyMode: 'direct',
         order: 0,

@@ -12,7 +12,7 @@
  */
 
 import { parseM3U, extractTvgUrl, checkStreams, type StreamCheckResult } from './m3u'
-import { getCustomLiveSource } from './customSource'
+import { getCustomLiveSource, getCustomLiveName } from './customSource'
 
 const STORAGE_KEY = 'mtvp:live:sources'
 /** 单源 M3U 内容持久化上限(防止 localStorage 爆量) */
@@ -85,7 +85,7 @@ function migrateLegacy(): void {
   if (existing.some((s) => s.url === legacy)) return
   const migrated: ManagedLiveSource = {
     id: generateId(),
-    name: '自定义直播(迁移)',
+    name: getCustomLiveName() || '自定义直播',
     url: legacy,
     type: 'url',
     enabled: true,

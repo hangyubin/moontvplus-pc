@@ -118,7 +118,7 @@ export default function Live() {
     onPlayingChange: setLivePlaying,
   })
   const { epgLoading, currentNextProgram } = useLiveEpg(currentChannel, currentSourceKey)
-  const { recordingId, recordingBytes, startRecording, stopRecording } = useLiveRecording(currentChannel, currentUrlIndex)
+  const { recordingId, recordingBytes, recordingStartTime, startRecording, stopRecording } = useLiveRecording(currentChannel, currentUrlIndex)
   // 防休眠:直播播放中屏幕常亮;仅录制中(可能已暂停观看)则只阻止系统睡眠
   usePowerSave(recordingId ? 'audio' : livePlaying ? 'video' : null)
 
@@ -548,6 +548,7 @@ export default function Live() {
         epgLoading={epgLoading}
         recordingId={recordingId}
         recordingBytes={recordingBytes}
+        recordingStartTime={recordingStartTime}
         onGoBack={goBack}
         onToggleRecording={() => { recordingId ? stopRecording() : startRecording() }}
         onToggleDiag={() => setShowDiag(v => !v)}

@@ -157,8 +157,8 @@ function writeResultIndex(keys: string[]): void {
 }
 
 /** 构造结果缓存键(含模式与过滤开关,保证不同配置互不串用) */
-function buildResultCacheKey(keyword: string, hideTrailers: boolean, blockNSFW: boolean): string {
-  return `${RESULT_PREFIX}${getHomeModeKey()}|${hideTrailers ? 1 : 0}${blockNSFW ? 1 : 0}|${keyword.trim()}`
+function buildResultCacheKey(keyword: string, hideTrailers: boolean, blockNSFW: boolean, blockSports: boolean): string {
+  return `${RESULT_PREFIX}${getHomeModeKey()}|${hideTrailers ? 1 : 0}${blockNSFW ? 1 : 0}${blockSports ? 1 : 0}|${keyword.trim()}`
 }
 
 /**
@@ -168,9 +168,10 @@ function buildResultCacheKey(keyword: string, hideTrailers: boolean, blockNSFW: 
 export function getPersistedSearchResults(
   keyword: string,
   hideTrailers: boolean,
-  blockNSFW: boolean
+  blockNSFW: boolean,
+  blockSports: boolean
 ): PersistedSourceGroup[] | null {
-  const key = buildResultCacheKey(keyword, hideTrailers, blockNSFW)
+  const key = buildResultCacheKey(keyword, hideTrailers, blockNSFW, blockSports)
   const groups = getCached<PersistedSourceGroup[]>(key, RESULT_TTL)
   if (!groups) return null
   // 命中即提到 LRU 最前
@@ -184,9 +185,10 @@ export function setPersistedSearchResults(
   keyword: string,
   hideTrailers: boolean,
   blockNSFW: boolean,
+  blockSports: boolean,
   groups: PersistedSourceGroup[]
 ): void {
-  const key = buildResultCacheKey(keyword, hideTrailers, blockNSFW)
+  const key = buildResultCacheKey(keyword, hideTrailers, blockNSFW, blockSports)
   const slimmed: PersistedSourceGroup[] = []
   let budget = RESULT_MAX_TOTAL
   for (const g of groups) {

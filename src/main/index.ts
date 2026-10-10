@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell, ipcMain, session, screen, powerSaveBlocker } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
+import { runRecording } from './hlsRecorder'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -374,45 +375,43 @@ app.whenReady().then(() => {
         return { ok: false, error: `无法创建录制目录: ${(e as Error)?.message}` }
       }
       const safeName = channelName.replace(/[\\/:*?"<>|]/g, '_')
-      const ext = url.includes('.flv') ? '.flv' : url.includes('.mp4') ? '.mp4' : '.ts'
+      // 扩展名按地址路径判断:HLS(m3u8/默认)的录制产物为 MPEG-TS
+      let ext = '.ts'
+      try {
+        const pathname = new URL(url).pathname.toLowerCase()
+        if (pathname.endsWith('.flv')) ext = '.flv'
+        else if (pathname.endsWith('.mp4')) ext = '.mp4'
+      } catch {
+        /* URL 异常时沿用默认 .ts */
+      }
       const filePath = join(recordDir, `${safeName}_${Date.now()}${ext}`)
       const session: RecordingSession = { controller, filePath, channelName, startTime: Date.now() }
       recordingSessions.set(recordId, session)
 
-      // 异步启动下载(不阻塞 IPC 返回)
+      // 异步启动录制(不阻塞 IPC 返回);HLS 会持续轮询分片直到用户停止
       ;(async () => {
+        let lastEmit = 0
         try {
-          const res = await fetch(url, { signal: controller.signal })
-          if (!res.ok) throw new Error(`HTTP ${res.status}`)
-          if (!res.body) throw new Error('响应无 body')
-
-          const writer = fs.createWriteStream(filePath, { flags: 'wx' })
-          const reader = res.body.getReader()
-          let bytes = 0
-
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            if (value) {
-              writer.write(Buffer.from(value))
-              bytes += value.byteLength
-              // 定期向渲染层汇报进度
-              if (bytes % (1024 * 512) < 65536) {
-                try {
-                  mainWindow?.webContents.send('live:recordingProgress', { recordId, bytes, filePath })
-                } catch {}
+          await runRecording(url, filePath, controller.signal, {
+            onProgress: (bytes) => {
+              // 进度事件最多每秒一次,避免高频 IPC
+              const nowTs = Date.now()
+              if (nowTs - lastEmit >= 1000) {
+                lastEmit = nowTs
+                mainWindow?.webContents.send('live:recordingProgress', { recordId, bytes, filePath })
               }
+            },
+            onComplete: (bytes) => {
+              mainWindow?.webContents.send('live:recordingComplete', { recordId, filePath, bytes })
             }
-          }
-          writer.end()
-          mainWindow?.webContents.send('live:recordingComplete', { recordId, filePath, bytes })
+          })
         } catch (err: any) {
           if (err?.name === 'AbortError') {
             mainWindow?.webContents.send('live:recordingStopped', { recordId, filePath })
           } else {
             mainWindow?.webContents.send('live:recordingError', {
               recordId,
-              error: err?.message || '下载失败',
+              error: err?.message || '录制失败',
               filePath
             })
           }

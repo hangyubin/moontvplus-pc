@@ -74,9 +74,8 @@ export function useLiveRecording(currentChannel: ChannelItem | null, currentUrlI
     return () => { unProgress(); unComplete(); unStopped(); unError() }
   }, [recordingId])
 
-  // recordingFilePath / recordingStartTime 保留与原实现一致(状态记录,当前 UI 未直接展示)
+  // recordingFilePath 仅作状态记录;recordingStartTime 供顶部栏显示录制时长
   void recordingFilePath
-  void recordingStartTime
 
-  return { recordingId, recordingBytes, startRecording, stopRecording }
+  return { recordingId, recordingBytes, recordingStartTime, startRecording, stopRecording }
 }

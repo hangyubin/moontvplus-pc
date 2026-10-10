@@ -9,6 +9,7 @@
 
 const K_VIDEO = 'custom_video_source'
 const K_LIVE = 'custom_live_source'
+const K_LIVE_NAME = 'custom_live_source_name'
 const K_LIVE_EPG = 'custom_live_epg'
 const K_MUSIC_URL = 'custom_music_source_url'
 const K_MUSIC_TOKEN = 'custom_music_source_token'
@@ -36,6 +37,16 @@ export function setCustomLiveSource(url: string) {
   const v = url.trim()
   if (v) localStorage.setItem(K_LIVE, v)
   else localStorage.removeItem(K_LIVE)
+}
+
+/** 自定义直播源显示名称(留空则回退到「自定义直播」) */
+export function getCustomLiveName(): string {
+  return (localStorage.getItem(K_LIVE_NAME) || '').trim()
+}
+export function setCustomLiveName(name: string) {
+  const v = name.trim()
+  if (v) localStorage.setItem(K_LIVE_NAME, v)
+  else localStorage.removeItem(K_LIVE_NAME)
 }
 
 /** 自定义 XMLTV EPG 节目单 URL(留空则尝试从 M3U 的 x-tvg-url 提取) */

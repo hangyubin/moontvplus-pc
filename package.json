@@ -1,6 +1,6 @@
 {
   "name": "moontvplus-pc",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "description": "MoonTVPlus PC 客户端 - 支持观看历史多端同步",
   "main": "./out/main/index.js",
   "author": "moontvplus-pc",
@@ -62,7 +62,9 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "${productName}-${version}-${arch}.${ext}",

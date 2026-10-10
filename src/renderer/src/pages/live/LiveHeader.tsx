@@ -1,6 +1,7 @@
 /**
  * 直播顶部栏 — 返回/源名/频道名、EPG 当前/下一节目、录制按钮、LIVE 标记、窗口控制
  */
+import { useEffect, useState } from 'react'
 import Icon from '../../components/Icon'
 import WindowControls from '../../components/WindowControls'
 import type { CurrentNextProgram } from '../../lib/m3u'
@@ -15,6 +16,8 @@ interface LiveHeaderProps {
   epgLoading: boolean
   recordingId: string | null
   recordingBytes: number
+  /** 本次录制开始时间戳(0 表示未录制),用于显示录制时长 */
+  recordingStartTime: number
   onGoBack: () => void
   onToggleRecording: () => void
   onToggleDiag: () => void
@@ -22,6 +25,16 @@ interface LiveHeaderProps {
   /** 启动全部线路测速 */
   onSpeedTest: () => void
   speedTesting: boolean
+}
+
+/** 录制时长:不足 1 小时显示 mm:ss,超过显示 h:mm:ss */
+function formatElapsed(sec: number): string {
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  const s2 = sec % 60
+  const mm = String(m).padStart(2, '0')
+  const ss = String(s2).padStart(2, '0')
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
 }
 
 const CN_DIGITS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
@@ -39,6 +52,7 @@ export default function LiveHeader({
   epgLoading,
   recordingId,
   recordingBytes,
+  recordingStartTime,
   onGoBack,
   onToggleRecording,
   onToggleDiag,
@@ -46,6 +60,19 @@ export default function LiveHeader({
   onSpeedTest,
   speedTesting,
 }: LiveHeaderProps) {
+  // 录制中每 0.5 秒刷新,驱动录制时长实时走动
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    if (!recordingId) return
+    setNow(Date.now())
+    const timer = setInterval(() => setNow(Date.now()), 500)
+    return () => clearInterval(timer)
+  }, [recordingId])
+
+  const elapsedSec = recordingStartTime
+    ? Math.max(0, Math.floor((now - recordingStartTime) / 1000))
+    : 0
+
   return (
     <header
       className="absolute top-0 left-0 right-0 h-10 flex items-stretch justify-between pl-4 pr-0 z-30"
@@ -95,24 +122,34 @@ export default function LiveHeader({
           <span className="text-white/30 text-xs">EPG加载中...</span>
         )}
 
-        {/* 录制按钮 */}
+        {/* 录制按钮:录制中变为实心"停止",随时点击结束;旁边实时显示时长与大小 */}
         {currentChannel && window.app?.live && (
           <button
             onClick={(e) => { e.stopPropagation(); onToggleRecording() }}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded transition-all ${
+            className={`flex items-center gap-1.5 px-2 py-1 rounded border transition-all ${
               recordingId
-                ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
-                : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 hover:text-white'
+                ? 'bg-red-500 text-white border-red-500 hover:bg-red-600 hover:border-red-600'
+                : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10 hover:text-white'
             }`}
-            title={recordingId ? '停止录制' : '开始录制'}
+            title={recordingId ? '停止录制,已录制内容会保留' : '开始录制'}
           >
-            <span className={`w-2 h-2 rounded-full ${recordingId ? 'bg-red-500 animate-pulse' : 'bg-white/40'}`} />
-            <span className="text-xs font-medium">{recordingId ? '录制中' : '录制'}</span>
+            {recordingId ? (
+              <Icon name="stop" size={10} />
+            ) : (
+              <span className="w-2 h-2 rounded-full bg-white/40" />
+            )}
+            <span className="text-xs font-semibold">{recordingId ? '停止' : '录制'}</span>
           </button>
         )}
         {recordingId && (
-          <span className="text-white/30 text-[10px] tabular-nums">
-            {(recordingBytes / 1024 / 1024).toFixed(1)}MB
+          <span className="flex items-center gap-1.5">
+            <span className="text-red-300 text-[11px] font-medium tabular-nums">
+              {formatElapsed(elapsedSec)}
+            </span>
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-white/30 text-[10px] tabular-nums">
+              {(recordingBytes / 1024 / 1024).toFixed(1)}MB
+            </span>
           </span>
         )}
 

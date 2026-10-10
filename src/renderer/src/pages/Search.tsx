@@ -55,7 +55,33 @@ const nsfwKeywords = ['伦理', '成人', '18禁', '18+', '三级', '大尺度',
 const nsfwEmojis = ['🔞', '🍆', '💋']
 
 /** 屏蔽关键词(标题中包含则过滤:解说、体育赛事等无关内容) */
-const BLOCKED_KEYWORDS = ['解说', '体育', 'NBA', 'CBA', '中超', '英超', '西甲', '意甲', '德甲', '法甲', '欧冠', '世界杯', '欧洲杯', '亚洲杯', '奥运会', '赛事', '集锦', '录像', '篮球', '足球', '网球', '斯诺克', '台球', '羽毛球', '乒乓球', '排球', '高尔夫', '拳击', 'F1', '赛车', '电竞', '奥运', '全明星', '季后赛', '总决赛', '半决赛', '四分之一决赛', '女篮', '男篮', '锦标赛', '联赛', '杯赛', '热身赛', '友谊赛', '预选赛', '小组赛', '淘汰赛']
+const BLOCKED_KEYWORDS = [
+  // 通用
+  '解说', '体育', '赛事', '集锦', '录像', '战报', '回放', '赛季', '赛程',
+  // 足球联赛
+  '足球', '中超', '中甲', '中乙', '中冠', '英超', '西甲', '意甲', '德甲', '法甲', '英冠', '西乙', '德乙', '意乙', '法乙', '苏超',
+  '欧冠', '欧联', '欧协联', '欧国联', '世预赛', '欧预赛', '美洲杯', '非洲杯', '亚冠', '亚预赛',
+  '世界杯', '欧洲杯', '亚洲杯', '联赛', '杯赛', '锦标赛', '热身赛', '友谊赛', '预选赛', '小组赛', '淘汰赛',
+  '环法',
+  // 篮球
+  '篮球', 'NBA', 'CBA', '中职篮', '中职联', '男篮', '女篮', '夏季联赛', '常规赛', '季前赛', '季后赛', '总决赛', '半决赛', '四分之一决赛', '全明星',
+  // 网球
+  '网球', '温网', '法网', '澳网', '美网', '中网', '大满贯', 'WTA', 'ATP',
+  // 乒乓球/羽毛球
+  '乒乓球', '乒乓', '羽毛球', '羽球', '排球',
+  // 其他球类
+  '高尔夫', '台球', '斯诺克', '橄榄球',
+  // 格斗/搏击
+  '拳击', 'UFC', 'MMA', '柔道', '跆拳道', '空手道', '摔跤', '击剑',
+  // 赛车
+  'F1', '赛车', '摩托', '拉力赛',
+  // 奥运/综合
+  '奥运', '奥运会', '冬奥', '亚运会', '全运会',
+  // 电竞
+  '电竞', '英雄联盟', '王者荣耀', '和平精英', 'Dota', 'LOL', 'LPL', 'KPL', 'LCK', 'CSGO', '反恐精英', '永劫无间', 'Valorant', 'Apex',
+  // 北美职业联赛
+  'NFL', 'MLB', 'NHL',
+]
 
 /** 判断文本是否含18禁标记(关键词 + emoji图标) */
 function hasNSFWMark(text: string): boolean {
@@ -211,6 +237,9 @@ export default function Search() {
  const [blockNSFW, setBlockNSFW] = useState(() => {
  try { return localStorage.getItem('search_blockNSFW') !== '0' } catch { return true }
  }) // 默认开启18禁过滤,持久化
+ const [blockSports, setBlockSports] = useState(() => {
+ try { return localStorage.getItem('search_blockSports') !== '0' } catch { return true }
+ }) // 默认开启体育内容过滤,持久化
  const [nsfwSourceKeys, setNsfwSourceKeys] = useState<Set<string>>(new Set())
  /** NSFW 源集合是否加载完成(完成前不发起搜索,避免集合为空时多搜一次) */
  const [nsfwLoaded, setNsfwLoaded] = useState(false)
@@ -228,6 +257,9 @@ export default function Search() {
  useEffect(() => {
  localStorage.setItem('search_blockNSFW', blockNSFW ? '1' : '0')
  }, [blockNSFW])
+ useEffect(() => {
+ localStorage.setItem('search_blockSports', blockSports ? '1' : '0')
+ }, [blockSports])
 
 // 加载搜索源列表(用于识别18禁源,从源头过滤)
  useEffect(() => {
@@ -293,7 +325,7 @@ export default function Search() {
 
  // 优先恢复 30 分钟内的持久结果:
  // 从详情/播放页返回时直接还原,不再发起全网搜索
- const persisted = getPersistedSearchResults(q, hideTrailers, blockNSFW)
+ const persisted = getPersistedSearchResults(q, hideTrailers, blockNSFW, blockSports)
  if (persisted) {
  const found = persisted.reduce((n, g) => n + g.results.length, 0)
  const errs = persisted
@@ -334,8 +366,8 @@ export default function Search() {
 
  const filtered = e.results.filter((r) => {
  const title = r.title || ''
- // 屏蔽体育/解说
- if (BLOCKED_KEYWORDS.some((kw) => title.includes(kw))) return false
+ // 屏蔽体育/解说(开关开启时)
+ if (blockSports && BLOCKED_KEYWORDS.some((kw) => title.includes(kw))) return false
  // 过滤预告片
  if (hideTrailers && isTrailer(r)) return false
  // 过滤18禁(开关开启时,逐条检查兜底)
@@ -386,7 +418,7 @@ export default function Search() {
  setLoading(false)
  setCompletedSources(e.completedSources || 0)
  // 持久化最终结果(瘦身+LRU+30分钟TTL),详情/播放页返回时直接恢复
- setPersistedSearchResults(q, hideTrailers, blockNSFW, groupsRef.current)
+ setPersistedSearchResults(q, hideTrailers, blockNSFW, blockSports, groupsRef.current)
  }
  }
 
@@ -398,7 +430,7 @@ export default function Search() {
  cancel()
  cancelRef.current = null
  }
- }, [q, hideTrailers, blockNSFW, nsfwSourceKeys, nsfwLoaded])
+ }, [q, hideTrailers, blockNSFW, blockSports, nsfwSourceKeys, nsfwLoaded])
 
  const handleCancel = useCallback(() => {
  cancelRef.current?.()
