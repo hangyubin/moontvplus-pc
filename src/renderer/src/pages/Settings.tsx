@@ -602,44 +602,44 @@ export default function Settings() {
                 </div>
               ))}
 
-              {/* 添加表单:名称+URL+添加 严格同一排 */}
+              {/* 添加表单:第一行 URL+添加(主操作) */}
               <div className="flex items-stretch gap-2 pt-1">
-                <input
-                  type="text"
-                  value={newSrcName}
-                  onChange={(e) => setNewSrcName(e.target.value)}
-                  placeholder="名称"
-                  title="直播源显示名称,留空自动取 URL 域名"
-                  spellCheck={false}
-                  className="input-field w-20 flex-shrink-0"
-                />
                 <input
                   type="text"
                   value={newSrcUrl}
                   onChange={(e) => setNewSrcUrl(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddSource() }}
-                  placeholder="M3U 直播源 URL"
+                  placeholder="M3U 直播源 URL(http:// 或 https://)"
                   spellCheck={false}
                   className="input-field flex-1 min-w-0"
                 />
                 <button
                   onClick={handleAddSource}
-                  className="px-4 text-sm font-medium rounded-lg text-white transition-colors flex-shrink-0"
+                  className="px-5 text-sm font-medium rounded-lg text-white transition-colors flex-shrink-0"
                   style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))' }}
                 >
                   添加
                 </button>
               </div>
 
-              {/* 第二行:本地导入 + 说明 */}
+              {/* 第二行:名称 + 本地导入(次要操作) */}
               <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newSrcName}
+                  onChange={(e) => setNewSrcName(e.target.value)}
+                  placeholder="名称(选填,默认取域名)"
+                  title="直播源显示名称,显示在直播页的源列表中;留空自动取 URL 域名"
+                  spellCheck={false}
+                  className="input-field flex-1 min-w-0"
+                />
                 <button
                   onClick={() => liveFileRef.current?.click()}
-                  className="text-xs px-3 py-1.5 rounded-md border border-[var(--color-border-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-overlay)] transition-colors flex-shrink-0"
+                  className="text-xs px-3 py-2 rounded-lg border border-[var(--color-border-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-hover-overlay)] transition-colors flex-shrink-0"
                 >
                   导入本地文件
                 </button>
-                <span className="text-xs text-[var(--color-text-tertiary)]">
+                <span className="text-xs text-[var(--color-text-tertiary)] truncate">
                   支持导入本地 .m3u/.m3u8/.txt 直播源文件
                 </span>
                 <input
