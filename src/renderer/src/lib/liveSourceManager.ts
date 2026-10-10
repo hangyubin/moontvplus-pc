@@ -12,7 +12,7 @@
  */
 
 import { parseM3U, extractTvgUrl, checkStreams, type StreamCheckResult } from './m3u'
-import { getCustomLiveSource, getCustomLiveName } from './customSource'
+import { getCustomLiveSource, getCustomLiveName, setCustomLiveSource } from './customSource'
 
 const STORAGE_KEY = 'mtvp:live:sources'
 /** 单源 M3U 内容持久化上限(防止 localStorage 爆量) */
@@ -77,12 +77,16 @@ function writeAll(list: ManagedLiveSource[]): void {
   }
 }
 
-/** 迁移旧的单一 custom_live_source 为列表首条(仅首次) */
+/** 迁移旧的单一 custom_live_source 为列表首条(仅首次,迁移后清除旧键防止删除后被重复迁移) */
 function migrateLegacy(): void {
   const legacy = getCustomLiveSource()
   if (!legacy) return
   const existing = readAll()
-  if (existing.some((s) => s.url === legacy)) return
+  // 已迁移过:清除旧键,避免用户删除该源后被再次加回
+  if (existing.some((s) => s.url === legacy)) {
+    setCustomLiveSource('')
+    return
+  }
   const migrated: ManagedLiveSource = {
     id: generateId(),
     name: getCustomLiveName() || '自定义直播',
@@ -92,6 +96,7 @@ function migrateLegacy(): void {
     createdAt: Date.now(),
   }
   writeAll([migrated, ...existing])
+  setCustomLiveSource('')
 }
 
 /* ============ 公开 API ============ */
